@@ -14,6 +14,8 @@ import { AbstractContext } from './abstractcontext.js';
 import { Namespace } from './namespace.js';
 import { Scope } from './scope.js';
 
+import { Memory } from './memory.js';
+
 class Evaluator {
     constructor() {
         let environment = new Environment();
@@ -24,6 +26,9 @@ class Evaluator {
         this.defaultNamespace = Evaluator.addDefaultNamespace(environment);
 
         this.environment = environment;
+
+        // 内存管理
+        this.memory = new Memory();
     }
 
     /**
@@ -63,7 +68,7 @@ class Evaluator {
         let lists = SParser.parse(tokens);
 
         let result;
-        for(let list of lists) {
+        for (let list of lists) {
             result = this.eval(list, this.defaultNamespace);
         }
         return result;
@@ -695,7 +700,7 @@ class Evaluator {
          */
 
         let nsi32 = environment.createNamespace('native.i32');
-        // TODO:: nsi32 全部都未实现
+        // TODO:: 部分未实现
 
         /**
          * f64 算术运算
@@ -723,7 +728,7 @@ class Evaluator {
          */
 
         let nsf64 = environment.createNamespace('native.f64');
-        // TODO:: 只实现了数学函数部分
+        // TODO:: 部分未实现
 
         // 数学函数
 
@@ -781,7 +786,7 @@ class Evaluator {
          */
 
         let nsf32 = environment.createNamespace('native.f32');
-        // TODO:: nsf32 全部都未实现
+        // TODO:: 部分未实现
 
         /**
          * - 整数(i32, i64)之间转换
@@ -825,7 +830,7 @@ class Evaluator {
          *   + f64.convert_i64_u (i64) -> f64
          *
          */
-        // TODO:: 全部都未实现
+        // TODO:: 部分未实现
     }
 
     /**
@@ -836,16 +841,6 @@ class Evaluator {
     static addBuiltinFunctionNamespace(environment) {
 
         let nsbuiltin = environment.createNamespace('builtin');
-
-        // 求值函数
-        // 返回值：标识符或者字面量的值
-        //
-        // 语法：
-        // - (val identifier)
-        // - (val literal)
-        nsbuiltin.defineIdentifier('val', (val) => {
-            return val;
-        });
 
         /**
         * 逻辑运算
