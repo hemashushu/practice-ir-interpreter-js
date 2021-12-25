@@ -4,7 +4,7 @@
 class Chunk {
     /**
      *
-     * @param {*} ref 初始值为 1
+     * @param {*} ref 引用计数值，初始值为 0
      * @param {*} count 成员数量，对于数组，成员数量是 0
      * @param {*} mark 成员的数据类型（基本类型还是自定义类型）
      * @param {*} data 一个 `ArrayBuffer` 对象
@@ -17,7 +17,7 @@ class Chunk {
     }
 
     /**
-     * 初始的 ref 数为 1
+     *
      * @param {*} count 成员数量
      */
     static createStruct(count) {
@@ -27,19 +27,19 @@ class Chunk {
         // `new ArrayBuffer` 方法会创建一个全 0 的字节数组
         // https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
         let data = new ArrayBuffer(bytesLength)
-        return new Chunk(1, count, 0, data);
+        return new Chunk(0, count, 0, data);
     }
 
     /**
-     * 初始的 ref 数为 1
+     *
      * @param {*} bytesLength
      */
-     static createBytes(bytesLength) {
+    static createBytes(bytesLength) {
         // length 为字节数
         // `new ArrayBuffer` 方法会创建一个全 0 的字节数组
         // https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
         let data = new ArrayBuffer(bytesLength)
-        return new Chunk(1, 0, 0, data);
+        return new Chunk(0, 0, 0, data);
     }
 }
 

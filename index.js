@@ -17,6 +17,9 @@ import { AbstractContext } from './src/abstractcontext.js';
 import { Namespace } from './src/namespace.js';
 import { Scope } from './src/scope.js';
 
+import { Chunk } from './src/chunk.js';
+import { Memory } from './src/memory.js';
+
 import { Evaluator } from './src/evaluator.js';
 
 export {
@@ -37,6 +40,9 @@ export {
     AbstractContext,
     Namespace,
     Scope,
+
+    Chunk,
+    Memory,
 
     Evaluator,
 };
