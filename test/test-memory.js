@@ -50,7 +50,7 @@ class TestMemory {
         assert.equal(memory.i64_read(addr1, 4), 55);
     }
 
-    static testMultipleChunkReadWrite() {
+    static testMultipleBytesChunkReadWrite() {
         let memory = new Memory();
 
         assert.deepEqual(memory.status(), {
@@ -110,7 +110,7 @@ class TestMemory {
         assert.equal(memory.i64_read(addr2, 8), 100034);
     }
 
-    static testResourceCollection() {
+    static testBytesChunkResourceCollection() {
         let memory = new Memory();
 
         // 第 1 个 bytes chunk
@@ -145,6 +145,8 @@ class TestMemory {
         let ref3 = memory.dec_ref(addr1);
         assert.equal(ref3, 0);
 
+        assert.equal(memory.getChunk(addr1), null);
+
         assert.deepEqual(memory.status(), {
             capacity: 2,
             free: 1,
@@ -167,6 +169,8 @@ class TestMemory {
         let ref4 = memory.dec_ref(addr2);
         assert.equal(ref4, 0);
 
+        assert.equal(memory.getChunk(addr2), null);
+
         assert.deepEqual(memory.status(), {
             capacity: 2,
             free: 1,
@@ -176,6 +180,8 @@ class TestMemory {
         // 将 chunk3 引用数减少到 0，chunk2 将会被资源回收
         let ref5 = memory.dec_ref(addr3);
         assert.equal(ref5, 0);
+
+        assert.equal(memory.getChunk(addr3), null);
 
         assert.deepEqual(memory.status(), {
             capacity: 2,
@@ -188,31 +194,37 @@ class TestMemory {
         let memory = new Memory();
 
         // chunk1 = point {
-        //     i64 x = 10,
-        //     i64 y = 20
+        //     i64 x = 123,
+        //     i64 y = 456
         // }
         let addr1 = memory.create_struct(2);
 
-        memory.i64_write(addr1, 0, 10);
-        memory.i64_write(addr1, 8, 20);
+        memory.i64_write(addr1, 0, 123);
+        memory.i64_write(addr1, 8, 456);
 
         // read chunk1
-        assert.equal(memory.i64_read(addr1, 0), 10);
-        assert.equal(memory.i64_read(addr1, 8), 20);
+        assert.equal(memory.i64_read(addr1, 0), 123);
+        assert.equal(memory.i64_read(addr1, 8), 456);
+
+        assert.equal(memory.read_mark(addr1, 0), 0);
+        assert.equal(memory.read_mark(addr1, 1), 0);
 
         // chunk2 = point {
-        //     i64 x = 110,
-        //     i64 y = 120
+        //     i64 x = 666,
+        //     i64 y = 777
         // }
 
         let addr2 = memory.create_struct(2);
 
-        memory.i64_write(addr2, 0, 110);
-        memory.i64_write(addr2, 8, 120);
+        memory.i64_write(addr2, 0, 666);
+        memory.i64_write(addr2, 8, 777);
 
         // read chunk2
-        assert.equal(memory.i64_read(addr2, 0), 110);
-        assert.equal(memory.i64_read(addr2, 8), 120);
+        assert.equal(memory.i64_read(addr2, 0), 666);
+        assert.equal(memory.i64_read(addr2, 8), 777);
+
+        assert.equal(memory.read_mark(addr2, 0), 0);
+        assert.equal(memory.read_mark(addr2, 1), 0);
 
         // chunk3 = rect {
         //     point top_left = chunk1,
@@ -230,6 +242,9 @@ class TestMemory {
         assert.equal(memory.read_address(addr3, 1), addr2);
 
         // check mark
+        assert.equal(memory.read_mark(addr3, 0), 1);
+        assert.equal(memory.read_mark(addr3, 1), 1);
+
         let chunk3 = memory.getChunk(addr3);
         assert.equal(chunk3.mark, 0b11);
 
@@ -298,6 +313,9 @@ class TestMemory {
         // drop chunk b1
         memory.dec_ref(chunkAddrB1);
 
+        assert.equal(memory.getChunk(chunkAddrB1), null);
+        assert.equal(memory.getChunk(chunkAddr2), null);
+
         // b1 和 chunk 2 应该都被回收
         assert.deepEqual(memory.status(), {
             capacity: 5,
@@ -308,6 +326,10 @@ class TestMemory {
         // drop chunk b2
         memory.dec_ref(chunkAddrB2);
 
+        assert.equal(memory.getChunk(chunkAddrB2), null);
+        assert.equal(memory.getChunk(chunkAddr3), null);
+        assert.equal(memory.getChunk(chunkAddr1), null);
+
         // b2 和 chunk 3 和 chunk 1 应该都被回收
         assert.deepEqual(memory.status(), {
             capacity: 5,
@@ -316,12 +338,118 @@ class TestMemory {
         });
     }
 
+    static testRefChain() {
+        let memory = new Memory();
+
+        // head1 <-- a4 <- a3 <- a2 <- a1
+        //                 |     |
+        // head2 <-  b1 <- /     |
+        // head3 <-  c2 <- c1 ---|
+
+        // line a
+
+        let a1 = memory.create_struct(1);
+
+        let a2 = memory.create_struct(1);
+        memory.add_ref(a2, 0, a1);
+
+        let a3 = memory.create_struct(1);
+        memory.add_ref(a3, 0, a2);
+
+        let a4 = memory.create_struct(1);
+        memory.add_ref(a4, 0, a3);
+
+        let head1 = memory.create_struct(1);
+        memory.add_ref(head1, 0, a4);
+
+        memory.inc_ref(head1);
+
+        // line b
+
+        let b1 = memory.create_struct(1);
+        memory.add_ref(b1, 0, a3);
+
+        let head2 = memory.create_struct(1);
+        memory.add_ref(head2, 0, b1);
+
+        memory.inc_ref(head2);
+
+        // line c
+        let c1 = memory.create_struct(1);
+        memory.add_ref(c1, 0, a2);
+
+        let c2 = memory.create_struct(1);
+        memory.add_ref(c2, 0, c1);
+
+        let head3 = memory.create_struct(1);
+        memory.add_ref(head3, 0, c2);
+
+        memory.inc_ref(head3);
+
+        assert.deepEqual(memory.status(), {
+            capacity: 10,
+            free: 0,
+            used: 10
+        });
+
+        // check a3, a2 ref
+        assert.equal(memory.getChunk(a3).ref, 2);
+        assert.equal(memory.getChunk(a2).ref, 2);
+
+        // drop head1
+        memory.dec_ref(head1);
+
+        // head1, a4 should be collected
+        assert.equal(memory.getChunk(head1), null);
+        assert.equal(memory.getChunk(a4), null);
+
+        assert.deepEqual(memory.status(), {
+            capacity: 10,
+            free: 2,
+            used: 8
+        });
+
+        // check a3, a2 ref
+        assert.equal(memory.getChunk(a3).ref, 1);
+        assert.equal(memory.getChunk(a2).ref, 2);
+
+        // drop head2
+        memory.dec_ref(head2);
+
+        // head2, b1, a3 should be collected
+        assert.equal(memory.getChunk(head2), null);
+        assert.equal(memory.getChunk(b1), null);
+        assert.equal(memory.getChunk(a3), null);
+
+        assert.deepEqual(memory.status(), {
+            capacity: 10,
+            free: 5,
+            used: 5
+        });
+
+        // check a2 ref
+        assert.equal(memory.getChunk(a2).ref, 1);
+
+        // drop head 1
+        memory.dec_ref(head3);
+
+        // all nodes should be collected
+        assert.deepEqual(memory.status(), {
+            capacity: 10,
+            free: 10,
+            used: 0
+        });
+    }
+
     static testMemory() {
         TestMemory.testBytesChunk();
-        TestMemory.testMultipleChunkReadWrite();
-        TestMemory.testResourceCollection();
+        TestMemory.testMultipleBytesChunkReadWrite();
+        TestMemory.testBytesChunkResourceCollection();
         TestMemory.testStructChunk();
         TestMemory.testMultipleRef();
+        TestMemory.testRefChain();
+
+        console.log('Memory passed');
     }
 }
 

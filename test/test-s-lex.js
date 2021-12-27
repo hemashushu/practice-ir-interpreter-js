@@ -39,8 +39,9 @@ class TestSLex {
 
     static testSLex() {
         TestSLex.testLiteral();
-        // TestSLex.testList();
-        // TestSLex.testCascadedList();
+        TestSLex.testList();
+        TestSLex.testCascadedList();
+
         console.log('SLex passed.')
     }
 }

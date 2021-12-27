@@ -64,7 +64,19 @@ class Memory {
     }
 
     /**
-     * 私有方法
+     * 读取指定成员的标记，如果指定的成员是一个基本数据类型，则返回 0，如果是一个数据地址，则返回 1。
+     * @param {*} addr
+     * @param {*} member_index
+     */
+    /*i32*/ read_mark(/*int*/ addr, /*i32*/ member_index) {
+        let chunk = this.chunks[addr];
+        let mark = chunk.mark;
+
+        return (mark & (1 << member_index)) === 0 ? 0 : 1;
+    }
+
+    /**
+     * 读取指定成员的地址值。
      * @param {*} addr
      * @param {*} member_index
      * @returns
@@ -212,7 +224,7 @@ class Memory {
      * 将 "被引用结构体" 的地址写入到指定结构体的指定成员，并
      * 增加 "被引用结构体" 的引用计数值。
      *
-     * 返回 ref_addr
+     * 返回 ref_addr 更新后的引用计数 int
      *
      * @param {*} addr
      * @param {*} member_index
@@ -220,7 +232,7 @@ class Memory {
      */
     add_ref(addr, member_index, ref_addr) {
         this.write_address(addr, member_index, ref_addr);
-        this.inc_ref(ref_addr);
+        return this.inc_ref(ref_addr);
     }
 
 }

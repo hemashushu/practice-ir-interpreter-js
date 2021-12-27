@@ -1,3 +1,5 @@
+import fs from 'fs';
+
 import { SLex } from './s-lex.js';
 import { SParser } from './s-parser.js';
 
@@ -18,17 +20,14 @@ import { Memory } from './memory.js';
 
 class Evaluator {
     constructor() {
-        let environment = new Environment();
-        Evaluator.addNativeFunctionNamespace(environment);
-        Evaluator.addBuiltinFunctionNamespace(environment)
+        this.environment = new Environment();
+        this.memory = new Memory(); // 内存管理
+
+        this.addNativeFunctionNamespace();
+        this.addBuiltinFunctionNamespace()
 
         // 设置 eval() 方法的默认命名空间为 `user`
-        this.defaultNamespace = Evaluator.addDefaultNamespace(environment);
-
-        this.environment = environment;
-
-        // 内存管理
-        this.memory = new Memory();
+        this.defaultNamespace = this.addDefaultNamespace();
     }
 
     /**
@@ -39,11 +38,15 @@ class Evaluator {
      *
      * @param {*} text
      */
-    loadModuleFromString(moduleName, text) {
-        let tokens = SLex.fromString(text);
-        let list = SParser.parse(tokens);
+    loadModuleFromFile(moduleName, filePath) {
         // TODO::
-        // 处理 `use` 表达式
+        // 处理 `use` 表达式。
+        // 处理相对路径。
+        // TODO::
+        // 添加对指定 `moduleName` 的支持。
+
+        let text = fs.readFileSync(filePath, 'utf-8');
+        return this.evalFromStringMultiExps(text);
     }
 
     /**
@@ -52,7 +55,7 @@ class Evaluator {
      * - 不支持 `use` 语句
      * - 不支持相对路径
      *
-     * 默认命名空间 `user`。
+     * 默认在命名空间 `user` 的上下文中。
      *
      * @param {*} singleExpText
      * @returns
@@ -63,6 +66,12 @@ class Evaluator {
         return this.eval(list, this.defaultNamespace);
     }
 
+    /**
+     * 解析一段文本，即并列有多条语句的文本。
+     *
+     * @param {*} multiExpsText
+     * @returns
+     */
     evalFromStringMultiExps(multiExpsText) {
         let tokens = SLex.fromString('(' + multiExpsText + ')');
         let lists = SParser.parse(tokens);
@@ -523,7 +532,7 @@ class Evaluator {
      * - native.f64.add 是 f64 加法
      *
      */
-    static addNativeFunctionNamespace(environment) {
+    addNativeFunctionNamespace() {
 
         /**
          * i64 算术运算
@@ -559,7 +568,7 @@ class Evaluator {
          *
          */
 
-        let nsi64 = environment.createNamespace('native.i64');
+        let nsi64 = this.environment.createNamespace('native.i64');
 
         // 算术运算
 
@@ -699,7 +708,7 @@ class Evaluator {
          *
          */
 
-        let nsi32 = environment.createNamespace('native.i32');
+        let nsi32 = this.environment.createNamespace('native.i32');
         // TODO:: 部分未实现
 
         /**
@@ -727,7 +736,7 @@ class Evaluator {
          * - sqrt 平方根
          */
 
-        let nsf64 = environment.createNamespace('native.f64');
+        let nsf64 = this.environment.createNamespace('native.f64');
         // TODO:: 部分未实现
 
         // 数学函数
@@ -785,7 +794,7 @@ class Evaluator {
          * - sqrt 平方根
          */
 
-        let nsf32 = environment.createNamespace('native.f32');
+        let nsf32 = this.environment.createNamespace('native.f32');
         // TODO:: 部分未实现
 
         /**
@@ -838,9 +847,9 @@ class Evaluator {
      *
      * @param {*} environment
      */
-    static addBuiltinFunctionNamespace(environment) {
+    addBuiltinFunctionNamespace() {
 
-        let nsbuiltin = environment.createNamespace('builtin');
+        let nsbuiltin = this.environment.createNamespace('builtin');
 
         /**
         * 逻辑运算
@@ -863,10 +872,68 @@ class Evaluator {
         nsbuiltin.defineIdentifier('not', (val) => {
             return val === 0 ? 1 : 0;
         });
+
+        // 调试函数
+        nsbuiltin.defineIdentifier('print', (val) => {
+            console.log(val);
+            return val;
+        });
+
+        nsbuiltin.defineIdentifier('panic', (code) => {
+            throw new EvalError('RUNTIME_EXCEPTION', {code}, 'Runtime exception');
+        });
+
+        // 用户自定义数据
+
+        let nsmemory = this.environment.createNamespace('builtin.memory');
+
+        nsmemory.defineIdentifier('create_bytes', (bytes_length) => {
+            return this.memory.create_bytes(bytes_length);
+        });
+
+        nsmemory.defineIdentifier('create_struct', (count) => {
+            return this.memory.create_struct(count);
+        });
+
+        nsmemory.defineIdentifier('i32_read', (addr, byte_offset) => {
+            return this.memory.i32_read(addr, byte_offset);
+        });
+
+        nsmemory.defineIdentifier('i64_read', (addr, byte_offset) => {
+            return this.memory.i64_read(addr, byte_offset);
+        });
+
+        nsmemory.defineIdentifier('i32_write', (addr, byte_offset, val) => {
+            return this.memory.i32_write(addr, byte_offset, val);
+        });
+
+        nsmemory.defineIdentifier('i64_write', (addr, byte_offset, val) => {
+            return this.memory.i64_write(addr, byte_offset, val);
+        });
+
+        nsmemory.defineIdentifier('read_mark', (addr, member_index) => {
+            return this.memory.read_mark(addr, member_index);
+        });
+
+        nsmemory.defineIdentifier('read_address', (addr, member_index) => {
+            return this.memory.read_address(addr, member_index);
+        });
+
+        nsmemory.defineIdentifier('inc_ref', (addr) => {
+            return this.memory.inc_ref(addr);
+        });
+
+        nsmemory.defineIdentifier('add_ref', (addr, member_index, ref_addr) => {
+            return this.memory.add_ref(addr, member_index, ref_addr);
+        });
+
+        nsmemory.defineIdentifier('dec_ref', (addr) => {
+            return this.memory.dec_ref(addr);
+        });
     }
 
-    static addDefaultNamespace(environment) {
-        let namespace = environment.createNamespace('user');
+    addDefaultNamespace() {
+        let namespace = this.environment.createNamespace('user');
         return namespace;
     }
 

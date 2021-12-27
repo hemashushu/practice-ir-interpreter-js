@@ -7,17 +7,6 @@ import {
     IdentifierError
 } from "../index.js";
 
-/**
- * Evaluator 实例创建后，默认在 `user` namespace 之中
- *
- * 测试环境里支持直接调用函数的表达式，以及
- * - `namespace`
- * - `do`
- * - `if`
- * - `loop`（及其子表达式 `break` 和 `recur`）
- * 等表达式，也可以直接对字面量和数值类型的标识符求值。
- *
- */
 class TestEvaluator {
 
     static testLiteral() {
