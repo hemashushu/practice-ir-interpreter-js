@@ -1,11 +1,18 @@
-;; 实现如下联合体 Option：
-;;
+;; 联合体 Option
+
 ;; union Option
 ;;     Some(Int value)
 ;;     None
 ;; end
 ;;
-;; 联合体将会翻译为结构体：
+;; 函数：
+;; Option::Some(Int value) -> Option::Some
+;;
+;; 常量：
+;; Option::None
+
+;; 注：
+;; 联合体将会翻译为结构体
 ;;
 ;; namespace std
 ;;     struct Option
@@ -14,11 +21,11 @@
 ;;     end
 ;;
 ;;     namespace Option
-;;         function Parent::Option new(Int memberNumber, WordWidth memberAddr)
+;;         function Parent::Option new_0(Int memberNumber, WordWidth memberAddr)
 ;;             ;; native
 ;;         end
 ;;
-;;         function Parent::Option new(Int memberNumber)
+;;         function Parent::Option new_1(Int memberNumber)
 ;;             ;; native
 ;;         end
 ;;
@@ -38,7 +45,10 @@
 
 
 (namespace std.Option
-    ;; 构建结构体类型成员
+    ;; 私有方法
+    ;; std::Option::new_0(WordWidth memberNumber, WordWidth member)
+    ;; 构建联合体的结构体类型成员
+
     (defn new_0
         (memberNumber memberAddr)
         (do
@@ -53,25 +63,29 @@
         )
     )
 
-    ;; 构建常量型成员
+    ;; 私有方法
+    ;; std::Option::new_1(WordWidth memberNumber)
+    ;; 构建联合体的常量型成员
+
     (defn new_1
         (memberNumber)
         (do
             (let addr (builtin.memory.create_struct 2))
-            (builtin.memory.i64_write addr 0 memberNumber)
-
-            ;; !! 注意必须把空的字段填上 0，JavaScript 会截断空字段
+            (builtin.memory.i64_write addr 0 memberNumber) ;;!注意必须把空的字段填上 0，JavaScript 会截断空字段
             (builtin.memory.i64_write addr 8 0)
         )
     )
 
-    ;; 构建 Some 成员
+    ;; std::Option::Some(Int value) -> Option::Some
+
     (defn Some (value)
         (do
             (let addr (std.Option.Some.new value))
             (new_0 0 addr)
         )
     )
+
+    ;; std::Option::None
 
     (const None
         (do
@@ -80,6 +94,8 @@
             addr
         )
     )
+
+    ;; std::Option::equal(Option left, Option right) -> i64
 
     (defn equal
         (leftAddr rightAddr)
@@ -115,7 +131,9 @@
 )
 
 (namespace std.Option.Some
-    ;; std::Option::Some::new(Int value)
+
+    ;; 私有方法
+    ;; std::Option::Some::new(Int value) -> Some
 
     (defn new
         (value)
@@ -126,7 +144,7 @@
         )
     )
 
-    ;; std::Option::Some::equal(Some left, Some right)
+    ;; std::Option::Some::equal(Some left, Some right) -> i64
 
     (defn equal
         (leftAddr rightAddr)
@@ -134,9 +152,10 @@
             (builtin.memory.inc_ref leftAddr)
             (builtin.memory.inc_ref rightAddr)
 
-            (let result (native.i64.eq
-                (builtin.memory.i64_read leftAddr 0)
-                (builtin.memory.i64_read rightAddr 0)
+            (let result
+                (native.i64.eq
+                    (builtin.memory.i64_read leftAddr 0)
+                    (builtin.memory.i64_read rightAddr 0)
                 )
             )
 
