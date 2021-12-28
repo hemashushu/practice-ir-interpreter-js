@@ -12,6 +12,8 @@
     - [读写数据的内容](#读写数据的内容)
     - [修改数据的引用计数](#修改数据的引用计数)
   - [资源回收](#资源回收)
+    - [let 表达式](#let-表达式)
+    - [loop 表达式](#loop-表达式)
 
 <!-- /code_chunk_output -->
 
@@ -201,7 +203,7 @@ XiaoXuan IR 不支持内存的直接读写，只能通过内置的函数来读�
 
 ::TODO 各种语句的回收模式，比如 let 语句，set 语句，函数参数
 
-:: 函数参数名称的约定： 基本类型 name，自定义类型 *name， 函数类型 #name
+// REMOVED :: 函数参数名称的约定： 基本类型 name，自定义类型 *name， 函数类型 #name
 
 :: hook 回收方法，即如何实现 drop trait
 
@@ -209,3 +211,10 @@ XiaoXuan IR 不支持内存的直接读写，只能通过内置的函数来读�
 
 `fn (arg1 arg2) (copy_identifier1 copy_identifer2) (ref_identifier1 ref_identifier2) (func_body)`
 
+### let 表达式
+
+需要在紧跟其后 inc_ref
+
+### loop 表达式
+
+自定义类型数据在传入 loop 之前需要线 inc_ref，在每个分支结束之前 dec_ref.
