@@ -81,7 +81,7 @@ class Memory {
      * @param {*} member_index
      * @returns
      */
-    /*int*/ read_address(/*int*/ addr, /*int32*/ member_index) {
+    /*int*/ get_address(/*int*/ addr, /*int32*/ member_index) {
         return this.i64_read(addr, member_index * 8);
     }
 

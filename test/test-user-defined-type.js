@@ -81,12 +81,12 @@ class TestUserDefinedType {
         // check ref address
         assert.equal(evaluator.evalFromString(
             `
-            (builtin.memory.read_address ${addr3} 0)
+            (builtin.memory.get_address ${addr3} 0)
             `), addr1);
 
         assert.equal(evaluator.evalFromString(
             `
-            (builtin.memory.read_address ${addr3} 1)
+            (builtin.memory.get_address ${addr3} 1)
             `), addr2);
 
         // check mark

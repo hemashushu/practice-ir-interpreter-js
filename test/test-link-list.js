@@ -62,7 +62,7 @@ class TestLinkList {
 
         // check internal value
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_address ${node1} 1)`), opt_none);
+            `(builtin.memory.get_address ${node1} 1)`), opt_none);
 
         /**
          * build `let opt_1 = Option::Some(node1)`

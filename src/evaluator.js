@@ -915,8 +915,8 @@ class Evaluator {
             return this.memory.read_mark(addr, member_index);
         });
 
-        nsmemory.defineIdentifier('read_address', (addr, member_index) => {
-            return this.memory.read_address(addr, member_index);
+        nsmemory.defineIdentifier('get_address', (addr, member_index) => {
+            return this.memory.get_address(addr, member_index);
         });
 
         nsmemory.defineIdentifier('inc_ref', (addr) => {

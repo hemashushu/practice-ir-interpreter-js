@@ -238,8 +238,8 @@ class TestMemory {
         memory.add_ref(addr3, 1, addr2);
 
         // read chunk3
-        assert.equal(memory.read_address(addr3, 0), addr1);
-        assert.equal(memory.read_address(addr3, 1), addr2);
+        assert.equal(memory.get_address(addr3, 0), addr1);
+        assert.equal(memory.get_address(addr3, 1), addr2);
 
         // check mark
         assert.equal(memory.read_mark(addr3, 0), 1);

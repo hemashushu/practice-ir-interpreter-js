@@ -110,8 +110,8 @@
                 (if (native.i64.eq left_member_number right_member_number)
                     (if (native.i64.eq left_member_number 0)
                         (std.Option.Some.equal
-                            (builtin.memory.read_address leftAddr 1)
-                            (builtin.memory.read_address rightAddr 1)
+                            (builtin.memory.get_address leftAddr 1)
+                            (builtin.memory.get_address rightAddr 1)
                         )
                         (if (native.i64.eq left_member_number 1)
                             1
