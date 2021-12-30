@@ -1,33 +1,32 @@
+import { SyntaxError } from './syntexerror.js';
 import { IdentifierError } from './identifiererror.js';
-import { AbstractContext } from './abstractcontext.js';
 
 /**
- * 命名空间用于存储用户自定义函数、内置函数及常量
- *
- * 命名空间之间没有继承关系，所有命名空间都从属于 Environment.
- *
+ * 一个虚拟的 Context
  */
-class Namespace extends AbstractContext {
-    constructor() {
-        super();
+class Namespace /* implement IContext */ {
+    constructor(global, moduleName, fullPath) {
+        this.global = global;
+        this.moduleName = moduleName;
+        this.fullPath = fullPath;
+    }
+
+    defineIdentifier(name, value) {
+        // 变量只可以在 scope 里定义
+        throw new SyntaxError(
+            'INVALID_LET_EXPRESSION',
+            {},
+            'Let expressions can only be defined in scopes');
     }
 
     exist(name) {
-        // 命名空间对象之间没有继承关系
-        return this.identifiers.has(name);
+        let fullName = this.fullPath + '.' + name;
+        return this.global.exist(fullName);
     }
 
     getIdentifier(name) {
-        let value = this.identifiers.get(name);
-        if (value === undefined) {
-            throw new IdentifierError(
-                'IDENTIFIER_NOT_FOUND',
-                { name: name },
-                `Identifier "${name}" not found`);
-
-        } else {
-            return value;
-        }
+        let fullName = this.fullPath + '.' + name;
+        return this.global.getIdentifier(fullName);
     }
 }
 

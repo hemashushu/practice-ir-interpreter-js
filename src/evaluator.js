@@ -11,83 +11,79 @@ import { UserDefineFunction } from './user-define-function.js';
 import { AnonymousFunction } from './anonymous-function.js';
 import { RecursionFunction } from './recursion-function.js';
 
-import { Environment } from './environment.js';
-import { AbstractContext } from './abstractcontext.js';
+import { Global } from './global.js';
 import { Namespace } from './namespace.js';
 import { Scope } from './scope.js';
+import { Closure } from './closure.js';
 
 import { Memory } from './memory.js';
 
 class Evaluator {
     constructor() {
-        this.environment = new Environment();
-        this.memory = new Memory(); // 内存管理
+        this.global = new Global(); // 全局表
+        this.memory = new Memory((destructor, chunkAddr) => {
+            this.eval([destructor, chunkAddr], this.defaultNamespace);
+        }); // 内存管理
 
-        this.addNativeFunctionNamespace();
-        this.addBuiltinFunctionNamespace()
+        this.addNativeFunctions();
+        this.addBuiltinFunctions()
 
         // 设置 eval() 方法的默认命名空间为 `user`
-        this.defaultNamespace = this.addDefaultNamespace();
+        this.defaultNamespace = this.createDefaultNamespace();
     }
 
     /**
-     * 加载一个模块的文本代码
-     *
-     * - 支持 `use` 语句
-     * - 支持相对路径
+     * 加载一个源代码文件
      *
      * @param {*} text
      */
     loadModuleFromFile(moduleName, filePath) {
-        // TODO::
-        // 处理 `use` 表达式。
-        // 处理相对路径。
-        // TODO::
-        // 添加对指定 `moduleName` 的支持。
+        // 设置默认命名空间为 module
+        let namespace = this.createNamespace(moduleName, moduleName);
 
         let text = fs.readFileSync(filePath, 'utf-8');
-        return this.evalFromStringMultiExps(text);
+        this.evalFromStringMultiExps(text, namespace);
+    }
+
+    /**
+     * 解析一段有并列多条表达式的文本。
+     *
+     * 默认在命名空间 `user` 的上下文中。
+     *
+     * @param {*} multiExpsText
+     * @returns
+     */
+    evalFromStringMultiExps(multiExpsText, namespace = this.defaultNamespace) {
+        let tokens = SLex.fromString('(' + multiExpsText + ')');
+        let lists = SParser.parse(tokens);
+
+        let result;
+        for (let list of lists) {
+            result = this.eval(list, namespace);
+        }
+        return result;
     }
 
     /**
      * 解析一条表达式的文本，并执行，然后返回表达式的值
      *
-     * - 不支持 `use` 语句
-     * - 不支持相对路径
      *
      * 默认在命名空间 `user` 的上下文中。
      *
      * @param {*} singleExpText
      * @returns
      */
-    evalFromString(singleExpText) {
+    evalFromString(singleExpText, namespace = this.defaultNamespace) {
         let tokens = SLex.fromString(singleExpText);
         let list = SParser.parse(tokens);
-        return this.eval(list, this.defaultNamespace);
-    }
-
-    /**
-     * 解析一段文本，即并列有多条语句的文本。
-     *
-     * @param {*} multiExpsText
-     * @returns
-     */
-    evalFromStringMultiExps(multiExpsText) {
-        let tokens = SLex.fromString('(' + multiExpsText + ')');
-        let lists = SParser.parse(tokens);
-
-        let result;
-        for (let list of lists) {
-            result = this.eval(list, this.defaultNamespace);
-        }
-        return result;
+        return this.eval(list, namespace);
     }
 
     /**
      * 执行一个表达式，返回表达式的值
      *
      * @param {*} exp
-     * @param {*} context
+     * @param {*} context Namespace, Scope 或者 Closure 实例
      * @returns
      */
     eval(exp, context) {
@@ -118,20 +114,21 @@ class Evaluator {
         //
         // 语法：
         // (const identifier-name value)
-        //
-        // 常量仅可以在 namespace 里定义
+
         if (op === 'const') {
             Evaluator.assertNumberOfParameters('const', exp.length - 1, 2);
 
+            // 常量仅可以在 namespace 里定义
             if (!(context instanceof Namespace)) {
                 throw new SyntaxError(
-                    'INVALID_CONST_EXPRESSION_PLACE',
+                    'INVALID_CONST_EXPRESSION',
                     {},
                     'Const expressions can only be defined in namespaces');
             }
 
             let [_, name, value] = exp;
-            return context.defineIdentifier(
+            return this.global.defineIdentifier(
+                context.fullPath,
                 name,
                 this.eval(value, context));
         }
@@ -141,14 +138,14 @@ class Evaluator {
         //
         // 语法：
         // (let identifier-name value)
-        //
-        // 变量只可以在 scope 里定义
+
         if (op === 'let') {
             Evaluator.assertNumberOfParameters('let', exp.length - 1, 2);
 
+            // 变量只可以在 scope 里定义
             if (!(context instanceof Scope)) {
                 throw new SyntaxError(
-                    'INVALID_LET_EXPRESSION_PLACE',
+                    'INVALID_LET_EXPRESSION',
                     {},
                     'Let expressions can only be defined in scopes');
             }
@@ -159,37 +156,57 @@ class Evaluator {
                 this.eval(value, context));
         }
 
-        if (op === 'set') {
-            Evaluator.assertNumberOfParameters('set', exp.length - 1, 2);
-
-            if (!(context instanceof Scope)) {
-                throw new SyntaxError(
-                    'INVALID_SET_EXPRESSION_PLACE',
-                    {},
-                    'Set expressions can only be used in scopes');
-            }
-
-            let [_, name, value] = exp;
-            return context.updateIdentifierValue(
-                name,
-                this.eval(value, context));
-        }
+        //         if (op === 'set') {
+        //             Evaluator.assertNumberOfParameters('set', exp.length - 1, 2);
+        //
+        //             if (context === null) {
+        //                 throw new SyntaxError(
+        //                     'INVALID_SET_EXPRESSION',
+        //                     {},
+        //                     'Set expressions can only be used in scopes');
+        //             }
+        //
+        //             let [_, name, value] = exp;
+        //             return context.updateIdentifierValue(
+        //                 name,
+        //                 this.eval(value, context, namespace));
+        //         }
 
         // 命名空间表达式
-        // 返回值：命名空间的 namespace 对象
+        // 无返回值
         //
         // 语法：
-        // (namespace name
-        //      (...)
-        //      (...)
+        // (namespace namePath
+        //      ...
         // )
+        //
+        // 或者
+        //
+        // (namespace ()
+        //      ...
+        // )
+
         if (op === 'namespace') {
-            // 为 namespace 创建一个单独的上下文
-            // 如此一来平行的多个命名空间就可以不相互影响
             let [_, namePath, ...exps] = exp;
 
-            const childContext = this.environment.createNamespace(namePath);
-            return this.evalExps(exps, childContext);
+            // 常量仅可以在模块里定义
+            if (!(context instanceof Namespace)) {
+                throw new SyntaxError(
+                    'INVALID_CONST_EXPRESSION',
+                    {},
+                    'Const expressions can only be defined in module');
+            }
+
+            let fullPath;
+            if (Array.isArray(namePath) && namePath.length === 0) {
+                fullPath = context.moduleName;
+            } else {
+                fullPath = context.moduleName + '.' + namePath;
+            }
+
+            let namespace = this.createNamespace(context.moduleName, fullPath);
+            this.evalExps(exps, namespace);
+            return;
         }
 
 
@@ -297,14 +314,13 @@ class Evaluator {
 
             if (!(context instanceof Namespace)) {
                 throw new SyntaxError(
-                    'INVALID_DEFN_EXPRESSION_PLACE',
+                    'INVALID_DEFN_EXPRESSION',
                     {},
                     'Defn expressions can only be defined in namespaces');
             }
 
             let [_, name, parameters, bodyExp] = exp;
 
-            // 因为闭包（closure）的需要，函数对象需要包含当前的上下文
             let userDefineFunc = new UserDefineFunction(
                 name,
                 parameters,
@@ -312,7 +328,10 @@ class Evaluator {
                 context
             );
 
-            return context.defineIdentifier(name, userDefineFunc);
+            return this.global.defineIdentifier(
+                context.fullPath,
+                name,
+                userDefineFunc);
         }
 
         // 含有递归调用的用户自定义函数
@@ -333,14 +352,13 @@ class Evaluator {
 
             if (!(context instanceof Namespace)) {
                 throw new SyntaxError(
-                    'INVALID_DEFN_EXPRESSION_PLACE',
+                    'INVALID_DEFNR_EXPRESSION',
                     {},
                     'Defnr expressions can only be defined in namespaces');
             }
 
             let [_, name, parameters, bodyExp] = exp;
 
-            // 因为闭包（closure）的需要，函数对象需要包含当前的上下文
             let recursionFunction = new RecursionFunction(
                 name,
                 parameters,
@@ -348,28 +366,50 @@ class Evaluator {
                 context
             );
 
-            return context.defineIdentifier(name, recursionFunction);
+            return this.global.defineIdentifier(
+                context.fullPath,
+                name,
+                recursionFunction);
         }
 
         // 匿名函数（即所谓 Lambda）
         // 匿名函数在一般函数内部定义，可以作为函数的返回值，或者作为参数传递给另外一个函数。
         //
         // 语法：
-        // (fn (param1 param2 ...) (...))
+        // (fn (param1 param2 ...)
+        //     (primitive_id1 primitive_id2 ...)
+        //     (ref_id1 ref_id2 ...)
+        //     ...
+        // )
         //
         // * 匿名函数隐含地创建了自己的作用域
         if (op === 'fn') {
-            Evaluator.assertNumberOfParameters('fn', exp.length - 1, 2);
-            let [_, parameters, bodyExp] = exp;
+            Evaluator.assertNumberOfParameters('fn', exp.length - 1, 4);
+            let [_, parameters, primitiveIdentifiers, refIdentifiers, bodyExp] = exp;
 
             // 因为闭包（closure）的需要，函数对象需要包含当前的上下文
+
+            let primitiveValues = primitiveIdentifiers.map(name => {
+                this.eval(name, context);
+            });
+
+            let refValues = refIdentifiers.map(name => {
+                this.eval(name, context);
+            });
+
+
             let anonymousFunc = new AnonymousFunction(
                 parameters,
-                bodyExp,
-                context
+                bodyExp
             );
 
-            return anonymousFunc;
+            let namespace = context;
+            while (!(namespace instanceof Namespace)) {
+                namespace = namespace.parentContext;
+            }
+
+            return this.memory.createClosure(primitiveIdentifiers, primitiveValues,
+                refIdentifiers, refValues, anonymousFunc, namespace);
         }
 
         // 函数调用
@@ -392,15 +432,25 @@ class Evaluator {
                 let { name, parameters, bodyExp, context: functionContext } = opValue;
                 return this.evalFunction(name, bodyExp, parameters, args, functionContext, context);
 
-            } else if (opValue instanceof AnonymousFunction) { // 匿名函数
-                let args = exp.slice(1);
-                let { parameters, bodyExp, context: functionContext } = opValue;
-                return this.evalFunction('lambda', bodyExp, parameters, args, functionContext, context);
-
             } else if (opValue instanceof RecursionFunction) { // 递归函数
                 let args = exp.slice(1);
                 let { name, parameters, bodyExp, context: functionContext } = opValue;
                 return this.evalRecursionFunction(name, bodyExp, parameters, args, functionContext, context);
+
+            } else if (Number.isInteger(opValue)) { // 匿名函数的闭包
+                let args = exp.slice(1);
+                let closure = this.memory.getChunk(opValue);
+
+                if (!(closure instanceof Closure)) {
+                    throw new EvalError(
+                        'ADDRESS_NOT_A_CLOSURE',
+                        { address: opValue },
+                        `The specified address is not a closure: "${opValue}"`);
+                }
+
+                let anonymousFunc = closure.anonymousFunc;
+                let { parameters, bodyExp } = anonymousFunc;
+                return this.evalFunction('lambda', bodyExp, parameters, args, closure, context);
 
             } else {
                 throw new EvalError(
@@ -520,6 +570,14 @@ class Evaluator {
         }
     }
 
+    createDefaultNamespace() {
+        return this.createNamespace('user', 'user');
+    }
+
+    createNamespace(moduleName, fullPath) {
+        return new Namespace(this.global, moduleName, fullPath);
+    }
+
     /**
      * 创建 `native` 命名空间，并加入虚拟机直接支持的指令
      * 函数名称保持与 WASM VM 指令名称一致
@@ -532,7 +590,7 @@ class Evaluator {
      * - native.f64.add 是 f64 加法
      *
      */
-    addNativeFunctionNamespace() {
+    addNativeFunctions() {
 
         /**
          * i64 算术运算
@@ -568,108 +626,108 @@ class Evaluator {
          *
          */
 
-        let nsi64 = this.environment.createNamespace('native.i64');
+        let nsi64 = this.createNamespace('native', 'native.i64');
 
         // 算术运算
 
-        nsi64.defineIdentifier('add', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'add', (lh, rh) => {
             return lh + rh;
         });
 
-        nsi64.defineIdentifier('sub', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'sub', (lh, rh) => {
             return lh - rh;
         });
 
-        nsi64.defineIdentifier('mul', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'mul', (lh, rh) => {
             return lh * rh;
         });
 
-        nsi64.defineIdentifier('div_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'div_s', (lh, rh) => {
             return lh / rh;
         });
 
-        nsi64.defineIdentifier('div_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'div_u', (lh, rh) => {
             // not implement yet
             throw new EvalError('NOT_IMPLEMENT');
         });
 
-        nsi64.defineIdentifier('rem_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'rem_s', (lh, rh) => {
             return lh % rh;
         });
 
-        nsi64.defineIdentifier('rem_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'rem_u', (lh, rh) => {
             // not implement yet
             throw new EvalError('NOT_IMPLEMENT');
         });
 
         // 位运算
 
-        nsi64.defineIdentifier('and', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'and', (lh, rh) => {
             return lh & rh;
         });
 
-        nsi64.defineIdentifier('or', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'or', (lh, rh) => {
             return lh | rh;
         });
 
-        nsi64.defineIdentifier('xor', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'xor', (lh, rh) => {
             return lh ^ rh;
         });
 
-        nsi64.defineIdentifier('shl', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'shl', (lh, rh) => {
             return lh << rh;
         });
 
-        nsi64.defineIdentifier('shr_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'shr_s', (lh, rh) => {
             return lh >> rh;
         });
 
-        nsi64.defineIdentifier('shr_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'shr_u', (lh, rh) => {
             return lh >>> rh;
         });
 
         // 比较运算
 
-        nsi64.defineIdentifier('eq', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'eq', (lh, rh) => {
             return lh === rh ? 1 : 0;
         });
 
-        nsi64.defineIdentifier('ne', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'ne', (lh, rh) => {
             return lh !== rh ? 1 : 0;
         });
 
-        nsi64.defineIdentifier('lt_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'lt_s', (lh, rh) => {
             return lh < rh ? 1 : 0;
         });
 
-        nsi64.defineIdentifier('lt_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'lt_u', (lh, rh) => {
             // not implement yet
             throw new EvalError('NOT_IMPLEMENT');
         });
 
-        nsi64.defineIdentifier('gt_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'gt_s', (lh, rh) => {
             return lh > rh ? 1 : 0;
         });
 
-        nsi64.defineIdentifier('gt_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'gt_u', (lh, rh) => {
             // not implement yet
             throw new EvalError('NOT_IMPLEMENT');
         });
 
-        nsi64.defineIdentifier('le_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'le_s', (lh, rh) => {
             return lh <= rh ? 1 : 0;
         });
 
-        nsi64.defineIdentifier('le_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'le_u', (lh, rh) => {
             // not implement yet
             throw new EvalError('NOT_IMPLEMENT');
         });
 
-        nsi64.defineIdentifier('ge_s', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'ge_s', (lh, rh) => {
             return lh >= rh ? 1 : 0;
         });
 
-        nsi64.defineIdentifier('ge_u', (lh, rh) => {
+        this.global.defineIdentifier(nsi64.fullPath, 'ge_u', (lh, rh) => {
             // not implement yet
             throw new EvalError('NOT_IMPLEMENT');
         });
@@ -708,7 +766,7 @@ class Evaluator {
          *
          */
 
-        let nsi32 = this.environment.createNamespace('native.i32');
+        let nsi32 = this.createNamespace('native', 'native.i32');
         // TODO:: 部分未实现
 
         /**
@@ -736,36 +794,36 @@ class Evaluator {
          * - sqrt 平方根
          */
 
-        let nsf64 = this.environment.createNamespace('native.f64');
+        let nsf64 = this.createNamespace('native', 'native.f64');
         // TODO:: 部分未实现
 
         // 数学函数
 
-        nsf64.defineIdentifier('abs', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'abs', (val) => {
             return Math.abs(val);
         });
 
-        nsf64.defineIdentifier('neg', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'neg', (val) => {
             return -val;
         });
 
-        nsf64.defineIdentifier('ceil', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'ceil', (val) => {
             return Math.ceil(val);
         });
 
-        nsf64.defineIdentifier('floor', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'floor', (val) => {
             return Math.floor(val);
         });
 
-        nsf64.defineIdentifier('trunc', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'trunc', (val) => {
             return Math.trunc(val);
         });
 
-        nsf64.defineIdentifier('nearest', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'nearest', (val) => {
             return Math.round(val);
         });
 
-        nsf64.defineIdentifier('sqrt', (val) => {
+        this.global.defineIdentifier(nsf64.fullPath, 'sqrt', (val) => {
             return Math.sqrt(val);
         });
 
@@ -794,7 +852,7 @@ class Evaluator {
          * - sqrt 平方根
          */
 
-        let nsf32 = this.environment.createNamespace('native.f32');
+        let nsf32 = this.createNamespace('native', 'native.f32');
         // TODO:: 部分未实现
 
         /**
@@ -844,12 +902,10 @@ class Evaluator {
 
     /**
      * 创建 `builtin` 命名空间，并加入内置函数
-     *
-     * @param {*} environment
      */
-    addBuiltinFunctionNamespace() {
+    addBuiltinFunctions() {
 
-        let nsbuiltin = this.environment.createNamespace('builtin');
+        let nsbuiltin = this.createNamespace('builtin', 'builtin');
 
         /**
         * 逻辑运算
@@ -861,85 +917,89 @@ class Evaluator {
 
         // 逻辑运算
 
-        nsbuiltin.defineIdentifier('and', (lh, rh) => {
+        this.global.defineIdentifier(nsbuiltin.fullPath, 'and', (lh, rh) => {
             return (lh & rh) !== 0 ? 1 : 0;
         });
 
-        nsbuiltin.defineIdentifier('or', (lh, rh) => {
+        this.global.defineIdentifier(nsbuiltin.fullPath, 'or', (lh, rh) => {
             return (lh | rh) === 0 ? 0 : 1;
         });
 
-        nsbuiltin.defineIdentifier('not', (val) => {
+        this.global.defineIdentifier(nsbuiltin.fullPath, 'not', (val) => {
             return val === 0 ? 1 : 0;
         });
 
         // 调试函数
-        nsbuiltin.defineIdentifier('print', (val) => {
+        this.global.defineIdentifier(nsbuiltin.fullPath, 'print', (val) => {
             console.log(val);
             return val;
         });
 
-        nsbuiltin.defineIdentifier('panic', (code) => {
-            throw new EvalError('RUNTIME_EXCEPTION', {code}, 'Runtime exception');
+        this.global.defineIdentifier(nsbuiltin.fullPath, 'panic', (code) => {
+            throw new EvalError('RUNTIME_EXCEPTION', { code }, 'Runtime exception');
         });
 
         // 用户自定义数据
 
-        let nsmemory = this.environment.createNamespace('builtin.memory');
+        let nsmemory = this.createNamespace('builtin', 'builtin.memory');
 
-        nsmemory.defineIdentifier('create_bytes', (bytes_length) => {
-            return this.memory.create_bytes(bytes_length);
+        this.global.defineIdentifier(nsmemory.fullPath, 'create_bytes', (bytes_length) => {
+            return this.memory.createBytes(bytes_length);
         });
 
-        nsmemory.defineIdentifier('create_struct', (count) => {
-            return this.memory.create_struct(count);
+        this.global.defineIdentifier(nsmemory.fullPath, 'create_struct', (count, mark) => {
+            return this.memory.createStruct(count, mark);
         });
 
-        nsmemory.defineIdentifier('i32_read', (addr, byte_offset) => {
-            return this.memory.i32_read(addr, byte_offset);
+        this.global.defineIdentifier(nsmemory.fullPath, 'create_struct_destructor', (count, mark, destructor_addr) => {
+            return this.memory.createStructDestructor(count, mark, destructor_addr);
         });
 
-        nsmemory.defineIdentifier('i64_read', (addr, byte_offset) => {
-            return this.memory.i64_read(addr, byte_offset);
+        this.global.defineIdentifier(nsmemory.fullPath, 'i32_read', (addr, byte_offset) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i32Read(byte_offset);
         });
 
-        nsmemory.defineIdentifier('i32_write', (addr, byte_offset, val) => {
-            return this.memory.i32_write(addr, byte_offset, val);
+        this.global.defineIdentifier(nsmemory.fullPath, 'i64_read', (addr, byte_offset) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i64Read(byte_offset);
         });
 
-        nsmemory.defineIdentifier('i64_write', (addr, byte_offset, val) => {
-            return this.memory.i64_write(addr, byte_offset, val);
+        this.global.defineIdentifier(nsmemory.fullPath, 'i32_write', (addr, byte_offset, val) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i32Write(byte_offset, val);
         });
 
-        nsmemory.defineIdentifier('read_mark', (addr, member_index) => {
-            return this.memory.read_mark(addr, member_index);
+        this.global.defineIdentifier(nsmemory.fullPath, 'i64_write', (addr, byte_offset, val) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i64Write(byte_offset, val);
         });
 
-        nsmemory.defineIdentifier('get_address', (addr, member_index) => {
-            return this.memory.get_address(addr, member_index);
+        // this.global.defineIdentifier(nsmemory.fullPath, 'read_mark', (addr, member_index) => {
+        //     return this.memory.read_mark(addr, member_index);
+        // });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'read_address', (addr, member_index) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.readAddress(member_index);
         });
 
-        nsmemory.defineIdentifier('inc_ref', (addr) => {
-            return this.memory.inc_ref(addr);
+        this.global.defineIdentifier(nsmemory.fullPath, 'inc_ref', (addr) => {
+            return this.memory.incRef(addr);
         });
 
-        nsmemory.defineIdentifier('add_ref', (addr, member_index, ref_addr) => {
-            return this.memory.add_ref(addr, member_index, ref_addr);
+        this.global.defineIdentifier(nsmemory.fullPath, 'add_ref', (addr, member_index, ref_addr) => {
+            return this.memory.addRef(addr, member_index, ref_addr);
         });
 
-        nsmemory.defineIdentifier('dec_ref', (addr) => {
-            return this.memory.dec_ref(addr);
+        this.global.defineIdentifier(nsmemory.fullPath, 'dec_ref', (addr) => {
+            return this.memory.decRef(addr);
         });
-    }
-
-    addDefaultNamespace() {
-        let namespace = this.environment.createNamespace('user');
-        return namespace;
     }
 
     getIdentifier(identifierNameOrFullName, context) {
-        if (identifierNameOrFullName.indexOf('.') > 0) {
-            return this.environment.getIdentifierByFullName(identifierNameOrFullName);
+        if (identifierNameOrFullName.indexOf('.') > 0) { // 标识符全称
+            return this.global.getIdentifier(identifierNameOrFullName);
         } else {
             return context.getIdentifier(identifierNameOrFullName);
         }

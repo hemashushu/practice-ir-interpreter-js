@@ -118,18 +118,22 @@ class TestEvaluator {
 
         try {
             evaluator.evalFromString('(const b 1)');
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof IdentifierError);
             assert.equal(err.code, 'IDENTIFIER_ALREADY_EXIST');
-            assert.deepEqual(err.data, { name: 'b' });
+            assert.deepEqual(err.data, { name: 'user.b' });
         }
 
         try {
             evaluator.evalFromString('c');
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof IdentifierError);
             assert.equal(err.code, 'IDENTIFIER_NOT_FOUND');
-            assert.deepEqual(err.data, { name: 'c' });
+            assert.deepEqual(err.data, { name: 'user.c' });
         }
 
     }
@@ -138,16 +142,19 @@ class TestEvaluator {
         let evaluator = new Evaluator();
 
         evaluator.evalFromString('(const a 1)'); // 默认命名空间是 `user`
+        evaluator.evalFromString('(namespace () (const b 2))'); // 默认模块是 `user`
         evaluator.evalFromString('(namespace foo (const a 10))');
         evaluator.evalFromString('(namespace foo.bar (const a 100))');
 
-        assert.equal(evaluator.evalFromString('a'), 1)
+        assert.equal(evaluator.evalFromString('a'), 1) // 默认命名空间是 `user`
+        assert.equal(evaluator.evalFromString('b'), 2) // 默认命名空间是 `user`
         assert.equal(evaluator.evalFromString('user.a'), 1)
-        assert.equal(evaluator.evalFromString('foo.a'), 10)
-        assert.equal(evaluator.evalFromString('foo.bar.a'), 100)
+        assert.equal(evaluator.evalFromString('user.b'), 2)
+        assert.equal(evaluator.evalFromString('user.foo.a'), 10)
+        assert.equal(evaluator.evalFromString('user.foo.bar.a'), 100)
     }
 
-    static testDo() {
+    static testDoAndLet() {
         let evaluator = new Evaluator();
 
         // check block return value
@@ -201,15 +208,17 @@ class TestEvaluator {
                     i
                  )`
             );
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof IdentifierError);
             assert.equal(err.code, 'IDENTIFIER_NOT_FOUND');
-            assert.deepEqual(err.data, { name: 'i' });
+            assert.deepEqual(err.data, { name: 'user.i' });
         }
 
         // try lookup another block variable
         try {
-            evaluator.evalFromString(
+            evaluator.evalFromStringMultiExps(
                 `
                 (do
                     (let i 2)
@@ -218,10 +227,12 @@ class TestEvaluator {
                     i
                 )`
             );
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof IdentifierError);
             assert.equal(err.code, 'IDENTIFIER_NOT_FOUND');
-            assert.deepEqual(err.data, { name: 'i' });
+            assert.deepEqual(err.data, { name: 'user.i' });
         }
 
     }
@@ -262,6 +273,8 @@ class TestEvaluator {
                     (set c 3)
                  )`
             );
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof IdentifierError);
             assert.equal(err.code, 'IDENTIFIER_NOT_FOUND');
@@ -278,6 +291,8 @@ class TestEvaluator {
                     (set b 3)
                  )`
             );
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof IdentifierError);
             assert.equal(err.code, 'IDENTIFIER_NOT_FOUND');
@@ -358,6 +373,9 @@ class TestEvaluator {
             (plusOne 2)`
         ), 3);
 
+        // 使用全称来调用函数
+        assert.equal(evaluator.evalFromString(`(user.plusOne 4)`), 5);
+
         // test lookup constant
         assert.equal(evaluator.evalFromStringMultiExps(
             `
@@ -392,84 +410,6 @@ class TestEvaluator {
             )
             (fib 8)`
         ), 34);
-    }
-
-    static testAnonymousFunction() {
-        let evaluator = new Evaluator();
-
-        // test invoke anonymous function directly
-        assert.equal(evaluator.evalFromString(
-            `((fn (i) (native.i64.mul i 3)) 9)`
-        ), 27);
-
-        // test assign an anonymous function to a variable
-        assert.equal(evaluator.evalFromString(
-            `
-            (do
-                (let f (fn (i) (native.i64.mul i 3)))
-                (f 7)
-            )`
-        ), 21);
-
-        // 在普通函数里定义匿名函数
-        assert.equal(evaluator.evalFromStringMultiExps(
-            `
-            (defn foo (i)
-                (do
-                    (let bar (fn () 3))
-                    (native.i64.add i (bar))
-                )
-            )
-            (foo 2)`
-        ), 5);
-
-        // test anonymous function as return value
-        assert.equal(evaluator.evalFromStringMultiExps(
-            `
-            (defn makeInc
-                (much)
-                (fn (base) (native.i64.add base much))
-            )
-
-            (do
-                (let incTwo (makeInc 2))
-                (incTwo 6)
-            )`
-        ), 8);
-
-        // test anonymous function as arg
-        assert.equal(evaluator.evalFromStringMultiExps(
-            `
-            (defn execFun
-                (i f)
-                (f i)
-            )
-            (execFun
-                3
-                (fn (i) (native.i64.mul i 2))
-            )`
-        ), 6);
-
-        // test loop by anonymous function recursion
-        assert.equal(evaluator.evalFromStringMultiExps(
-            `
-            (defn accumulate (count)
-                (do
-                    (let internalLoop
-                        (fn (i result)
-                            (if (native.i64.eq i 0)
-                                result
-                                (internalLoop (native.i64.sub i 1) (native.i64.add i result))
-                            )
-                        )
-                    )
-                    (internalLoop count 0)
-                )
-            )
-            (accumulate 100)
-            `
-        ), 5050);
-
     }
 
     static testRecursionFunction() {
@@ -508,6 +448,8 @@ class TestEvaluator {
         // incorrent number of parameters
         try {
             evaluator.evalFromString('(native.i64.add 1)');
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof SyntaxError);
             assert.equal(err.code, 'INCORRECT_NUMBER_OF_PARAMETERS');
@@ -517,10 +459,12 @@ class TestEvaluator {
         // call non-exist function
         try {
             evaluator.evalFromString('(noThisFunction)');
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof EvalError);
             assert.equal(err.code, 'IDENTIFIER_NOT_FOUND');
-            assert.deepEqual(err.data, { name: 'noThisFunction' });
+            assert.deepEqual(err.data, { name: 'user.noThisFunction' });
         }
 
         // invoke a variable
@@ -528,10 +472,12 @@ class TestEvaluator {
 
         try {
             evaluator.evalFromString(`(foo 1 2)`);
+            assert.fail();
+
         } catch (err) {
             assert(err instanceof EvalError);
-            assert.equal(err.code, 'IDENTIFIER_NOT_A_FUNCTION');
-            assert.deepEqual(err.data, { name: 'foo' });
+            assert.equal(err.code, 'ADDRESS_NOT_A_CLOSURE');
+            assert.deepEqual(err.data, { address: 2 });
         }
     }
 
@@ -546,14 +492,14 @@ class TestEvaluator {
 
         TestEvaluator.testConstant();
         TestEvaluator.testNamespace();
-        TestEvaluator.testDo();
-        TestEvaluator.testVariable();
+        TestEvaluator.testDoAndLet();
+
+        // TestEvaluator.testVariable();
 
         TestEvaluator.testConditionControlFlow();
         TestEvaluator.testLoopControlFlow();
 
         TestEvaluator.testUserDefineFunction();
-        TestEvaluator.testAnonymousFunction();
         TestEvaluator.testRecursionFunction();
         TestEvaluator.testFunctionError();
 

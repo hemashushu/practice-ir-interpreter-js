@@ -16,16 +16,16 @@
 ;;
 ;; namespace std
 ;;     struct Option
-;;         WordWidth memberNumber
-;;         WordWidth memberAddr
+;;         WordWidth member_number
+;;         WordWidth member_addr
 ;;     end
 ;;
 ;;     namespace Option
-;;         function Parent::Option new_0(Int memberNumber, WordWidth memberAddr)
+;;         function Parent::Option new(Int member_number, WordWidth member_addr)
 ;;             ;; native
 ;;         end
 ;;
-;;         function Parent::Option new_1(Int memberNumber)
+;;         function Parent::Option new$1(Int member_number)
 ;;             ;; native
 ;;         end
 ;;
@@ -43,45 +43,43 @@
 ;;     end
 ;; end
 
+;; !! 模块名称 "std"
 
-(namespace std.Option
+(namespace Option
     ;; 私有方法
-    ;; std::Option::new_0(WordWidth memberNumber, WordWidth member)
+    ;; std::Option::new(WordWidth member_number, WordWidth member_addr)
     ;; 构建联合体的结构体类型成员
 
-    (defn new_0
-        (memberNumber memberAddr)
+    (defn new
+        (member_number member_addr)
         (do
-            (builtin.memory.inc_ref memberAddr)
-
-            (let addr (builtin.memory.create_struct 2))
-            (builtin.memory.i64_write addr 0 memberNumber)
-            (builtin.memory.add_ref addr 1 memberAddr)
-
-            (builtin.memory.dec_ref memberAddr)
+            (let addr (builtin.memory.create_struct 2 2))
+            (builtin.memory.i64_write addr 0 member_number)
+            (builtin.memory.add_ref addr 1 member_addr)
             addr
         )
     )
 
     ;; 私有方法
-    ;; std::Option::new_1(WordWidth memberNumber)
+    ;; std::Option::new$1(WordWidth member_number)
     ;; 构建联合体的常量型成员
 
-    (defn new_1
-        (memberNumber)
+    (defn new$1
+        (member_number)
         (do
-            (let addr (builtin.memory.create_struct 2))
-            (builtin.memory.i64_write addr 0 memberNumber) ;;!注意必须把空的字段填上 0，JavaScript 会截断空字段
+            (let addr (builtin.memory.create_struct 2 0))
+            (builtin.memory.i64_write addr 0 member_number) ;;!注意必须把空的字段填上 0，JavaScript 会截断空字段
             (builtin.memory.i64_write addr 8 0)
         )
     )
 
     ;; std::Option::Some(Int value) -> Option::Some
+    ;; 快捷构建子成员的方法
 
     (defn Some (value)
         (do
             (let addr (std.Option.Some.new value))
-            (new_0 0 addr)
+            (new 0 addr)
         )
     )
 
@@ -89,8 +87,8 @@
 
     (const None
         (do
-            (let addr (new_1 1))
-            (builtin.memory.inc_ref addr) ;; let/const 需要增加引用值
+            (let addr (new$1 1))
+            (builtin.memory.inc_ref addr) ;; const 需要增加引用值
             addr
         )
     )
@@ -98,39 +96,34 @@
     ;; std::Option::equal(Option left, Option right) -> i64
 
     (defn equal
-        (leftAddr rightAddr)
+        (left_addr right_addr)
         (do
-            (builtin.memory.inc_ref leftAddr)
-            (builtin.memory.inc_ref rightAddr)
+            (let left_member_number (builtin.memory.i64_read left_addr 0))
+            (let right_member_number (builtin.memory.i64_read right_addr 0))
 
-            (let left_member_number (builtin.memory.i64_read leftAddr 0))
-            (let right_member_number (builtin.memory.i64_read rightAddr 0))
-
-            (let result
                 (if (native.i64.eq left_member_number right_member_number)
                     (if (native.i64.eq left_member_number 0)
+                        ;; Option::Some
                         (std.Option.Some.equal
-                            (builtin.memory.get_address leftAddr 1)
-                            (builtin.memory.get_address rightAddr 1)
+                            (builtin.memory.read_address left_addr 1)
+                            (builtin.memory.read_address right_addr 1)
                         )
+                        ;; Option::None
                         (if (native.i64.eq left_member_number 1)
                             1
+
+                            ;; 非联合体成员
                             (builtin.panic 10001)
                         )
                     )
                     0
                 )
-            )
 
-            (builtin.memory.dec_ref leftAddr)
-            (builtin.memory.dec_ref rightAddr)
-
-            result
         )
     )
 )
 
-(namespace std.Option.Some
+(namespace Option.Some
 
     ;; 私有方法
     ;; std::Option::Some::new(Int value) -> Some
@@ -138,7 +131,7 @@
     (defn new
         (value)
         (do
-            (let addr (builtin.memory.create_struct 1))
+            (let addr (builtin.memory.create_struct 1 0))
             (builtin.memory.i64_write addr 0 value)
             addr
         )
@@ -147,22 +140,10 @@
     ;; std::Option::Some::equal(Some left, Some right) -> i64
 
     (defn equal
-        (leftAddr rightAddr)
-        (do
-            (builtin.memory.inc_ref leftAddr)
-            (builtin.memory.inc_ref rightAddr)
-
-            (let result
-                (native.i64.eq
-                    (builtin.memory.i64_read leftAddr 0)
-                    (builtin.memory.i64_read rightAddr 0)
-                )
-            )
-
-            (builtin.memory.dec_ref leftAddr)
-            (builtin.memory.dec_ref rightAddr)
-
-            result
+        (left_addr right_addr)
+        (native.i64.eq
+            (builtin.memory.i64_read left_addr 0)
+            (builtin.memory.i64_read right_addr 0)
         )
     )
 )

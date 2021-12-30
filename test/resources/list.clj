@@ -30,72 +30,65 @@
 ;; List::rest(List) -> List
 ;; List::add(List, Node) -> List
 
-(namespace std.Node
+;; !! 模块名称 "std"
+
+(namespace Node
 
     ;; std::Node::new(Int value, Option<Node> nextOptionNode) -> Node
 
     (defn new
-        (value nextOptionNodeAddr)
+        (value next_option_node_addr)
         (do
-            (builtin.memory.inc_ref nextOptionNodeAddr)
-
-            (let addr (builtin.memory.create_struct 2))
+            (let addr (builtin.memory.create_struct 2 2))
             (builtin.memory.i64_write addr 0 value)
-            (builtin.memory.add_ref addr 1 nextOptionNodeAddr)
-
-            (builtin.memory.dec_ref nextOptionNodeAddr)
-
+            (builtin.memory.add_ref addr 1 next_option_node_addr)
             addr
         )
+    )
+
+    (defn getValue
+        (node_addr)
+        (builtin.memory.i64_read node_addr 0)
     )
 )
 
-
-(namespace std.Option
+(namespace Option
 
     ;; 私有方法
-    ;; std::Option::new_0(WordWidth memberNumber, WordWidth member) -> Option
+    ;; std::Option::new(WordWidth member_number, WordWidth member_addr) -> Option
     ;; 构建联合体的结构体类型成员
 
-    (defn new_0
-        (memberNumber memberAddr)
+    (defn new
+        (member_number member_addr)
         (do
-            (builtin.memory.inc_ref memberAddr)
-
-            (let addr (builtin.memory.create_struct 2))
-            (builtin.memory.i64_write addr 0 memberNumber)
-            (builtin.memory.add_ref addr 1 memberAddr)
-
-            (builtin.memory.dec_ref memberAddr)
+            (let addr (builtin.memory.create_struct 2 2))
+            (builtin.memory.i64_write addr 0 member_number)
+            (builtin.memory.add_ref addr 1 member_addr)
             addr
         )
     )
 
     ;; 私有方法
-    ;; std::Option::new_1(WordWidth memberNumber) -> Option
+    ;; std::Option::new$1(WordWidth member_number) -> Option
     ;; 构建联合体的常量型成员
 
-    (defn new_1
-        (memberNumber)
+    (defn new$1
+        (member_number)
         (do
-            (let addr (builtin.memory.create_struct 2))
-            (builtin.memory.i64_write addr 0 memberNumber) ;;!注意必须把空的字段填上 0，JavaScript 会截断空字段
+            (let addr (builtin.memory.create_struct 2 0))
+            (builtin.memory.i64_write addr 0 member_number) ;;!注意必须把空的字段填上 0，JavaScript 会截断空字段
             (builtin.memory.i64_write addr 8 0)
             addr
         )
     )
 
     ;; std::Option::Some(Node node) -> Option::Some
+    ;; 快捷构建子成员的方法
 
-    (defn Some (nodeAddr)
+    (defn Some (node_addr)
         (do
-            (std.memory.inc_ref nodeAddr)
-
-            (let addr (std.Option.Some.new nodeAddr))
-            (new_0 0 addr)
-
-            (std.memory.dec_ref nodeAddr)
-
+            (let addr (std.Option.Some.new node_addr))
+            (new 0 addr)
             addr
         )
     )
@@ -104,31 +97,24 @@
 
     (const None
         (do
-            (let addr (new_1 1))
-            (builtin.memory.inc_ref addr) ;; let/const 需要增加引用值
+            (let addr (new$1 1))
+            (builtin.memory.inc_ref addr) ;; const 需要增加引用值
             addr
         )
     )
-
 )
 
-(namespace std.Option.Some
+(namespace Option.Some
 
     ;; 私有方法
     ;; std::Option::Some::new(Node node) -> Some
 
     (defn new
-        (nodeAddr)
+        (node_addr)
         (do
-            (std.memory.inc_ref nodeAddr)
-
-            (let addr (builtin.memory.create_struct 1))
-            (builtin.memory.add_ref addr 0 nodeAddr)
-
-            (std.memory.dec_ref nodeAddr)
-
+            (let addr (builtin.memory.create_struct 1 1))
+            (builtin.memory.add_ref addr 0 node_addr)
             addr
         )
     )
-
 )

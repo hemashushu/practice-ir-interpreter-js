@@ -6,9 +6,6 @@
  * Copyright (c) 2021 Hippospark <Hippospark@gmail.com>, All rights reserved.
  */
 
-import { JsonLex } from './src/json-lex.js';
-import { JsonParser } from './src/json-parser.js';
-
 import { SLex } from './src/s-lex.js';
 import { SParser } from './src/s-parser.js';
 
@@ -20,10 +17,10 @@ import { UserDefineFunction } from './src/user-define-function.js';
 import { AnonymousFunction } from './src/anonymous-function.js';
 import { RecursionFunction } from './src/recursion-function.js';
 
-import { Environment } from './src/environment.js';
-import { AbstractContext } from './src/abstractcontext.js';
+import { Global } from './src/global.js';
 import { Namespace } from './src/namespace.js';
 import { Scope } from './src/scope.js';
+import { Closure } from './src/closure.js';
 
 import { Chunk } from './src/chunk.js';
 import { Memory } from './src/memory.js';
@@ -31,8 +28,6 @@ import { Memory } from './src/memory.js';
 import { Evaluator } from './src/evaluator.js';
 
 export {
-    JsonLex,
-    JsonParser,
     SLex,
     SParser,
 
@@ -44,10 +39,10 @@ export {
     AnonymousFunction,
     RecursionFunction,
 
-    Environment,
-    AbstractContext,
+    Global,
     Namespace,
     Scope,
+    Closure,
 
     Chunk,
     Memory,

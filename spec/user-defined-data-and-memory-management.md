@@ -35,7 +35,9 @@ XiaoXuan Lang IR 本地结构体（以下简称为 `对象`）的结构如下：
 
 - i16 type
 
-  对象的类型，目前有 3 种：`多成员结构体`（0）、`字节数组`（1）、`匿名函数`（2），当多成员结构体带有 `析构函数` 时，值为（4）。
+  对象的类型，目前有 3 种：`多成员结构体`（1）、`字节数组`（2）、`匿名函数`（4）。
+
+  当多成员结构体带有 `析构函数` 时，数值的第 8 位会被置为 1，所以带有析构函数的多成员结构体的 type 值为（2^7 & 1 = 128 + 1 = 129）。
 
 - i16 count
 
@@ -49,7 +51,7 @@ XiaoXuan Lang IR 本地结构体（以下简称为 `对象`）的结构如下：
 
   当对象是 `字节数组` 时，该字段是`字节数组` 的长度，显然字节数组的最大长度是 \(2^32\) 。
 
-- byte[] data | i64[] data | int data
+- byte[] data | i64[] data
 
   对象的数据内容。data 的结构跟对象的类型有关：
 
@@ -67,7 +69,7 @@ XiaoXuan Lang IR 本地结构体（以下简称为 `对象`）的结构如下：
 ```js
 {
     ref: 0,
-    type: 1,
+    type: 0b0010,
     count: 0,
     size: N,
     data: [byte 0, byte 1,..., byte N]
@@ -88,7 +90,7 @@ struct Point {
 // native structure
 {
     ref: 0,
-    type: 0,
+    type: 0b0001,
     count: 2,
     mark: 0,
     data: [i64, i64]
@@ -109,7 +111,7 @@ struct Rect {
 // native structure
 {
     ref: 0,
-    type: 0
+    type: 0b0001
     count: 2,
     mark: 0b11,
     data: [(address of topLeft), (address of bottomRight)]
@@ -126,7 +128,7 @@ struct Rect {
 // native structure
 {
     ref: 0,
-    type: 2
+    type: 0b0100
     count: 2,
     mark: 0b01,
     data: [i64, (address of user)]
@@ -155,7 +157,7 @@ end
 // native structure
 {
     ref: 0,
-    type: 4,
+    type: 0b10000001,
     count: 1,
     mark: 0b1
     data: [(address of file)]
@@ -165,31 +167,31 @@ end
 
 ## 对象的访问
 
-XiaoXuan Lang IR 不支持内存的直接读写，只能通过内置的函数来读写对象。这样可以为解析器和编译器带来灵活性，比如解析器可以使用宿主运行时现有的内存管理器，而编译器到 WASM 或者本地代码，只需将内存读写函数调用替换成内联代码即可。
+XiaoXuan Lang IR 提供一些内置的函数来构建和读写对象。
 
 ### 分配对象的内存空间
 
 - `int create_bytes(i32 bytes_length)`
 
-  创建一个 `字节数组` 类型的对象，内存的内容不会被初始化，函数返回该对象在内存中的地址。
+  创建一个 `字节数组` 类型的对象，内存的内容初始化为 `0`，函数返回该对象在内存中的地址。
 
-- `int create_bytes_zero(i32 bytes_length)`
+<!-- - `int create_bytes_zero(i32 bytes_length)`
 
-  跟 `create_bytes` 类似，但会将内存的内容初始化为 `0`。
+  跟 `create_bytes` 类似，但会将内存的内容初始化为 `0`。 -->
 
 - `int create_struct(i16 count， i32 mark)`
 
   创建一个 `多成员结构体` 类型的对象，其中 `count` 为成员个数，`mark` 为各个成员的是否对象类型的标记。
 
-- `int create_clojure(i16 count， i32 mark)`
-
-  创建一个 `匿名函数` 类型的对象，其中 `count` 为成员个数，`mark` 为各个成员的是否对象类型的标记。
-
 - `int create_struct_destructor(i16 count， i32 mark, int destructor_addr)`
 
   创建一个带 `析构函数` 的 `多成员结构体` 对象，`destructor_addr 是析构函数的地址。
 
-### 读写对象的内容
+<!-- - `int create_closure(i16 count， i32 mark)`
+
+  创建一个 `匿名函数` 类型的对象，其中 `count` 为成员个数，`mark` 为各个成员的是否对象类型的标记。 -->
+
+### 读写内存
 
 读取数据的函数：
 
@@ -226,10 +228,11 @@ XiaoXuan Lang IR 不支持内存的直接读写，只能通过内置的函数来
 
 上述函数中，`addr` 参数是目标对象的内存地址，`byte_offset` 是字节偏移量。对于 `多成员结构体` 的对象来说，因为每个成员都占用 8 bytes，所以 `byte_offset` 应该是 8 的整数倍，即 `成员的索引 * 8`。
 
-- `int get_address(int addr, i32 member_index)`
+- `int read_address(int addr, i32 member_index)`
 
   获取指定成员的地址值。
 
+<!--
 - `i32 get_type(int addr)`
 
   获取成员的标记。
@@ -249,6 +252,7 @@ XiaoXuan Lang IR 不支持内存的直接读写，只能通过内置的函数来
 - `int get_destructor(int addr)`
 
   获取对象的析构函数地址。
+-->
 
 ## 资源回收
 

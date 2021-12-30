@@ -11,35 +11,24 @@ import {
 class TestLinkList {
 
     static testCreateNode() {
-        let optionFilePath = path.resolve('test', 'resources', 'list.clj');
+        let srcFilePath = path.resolve('test', 'resources', 'list.clj');
 
         let evaluator = new Evaluator();
-        evaluator.loadModuleFromFile('std', optionFilePath);
+        evaluator.loadModuleFromFile('std', srcFilePath);
+
+        // build:
+        // node2(456) --next--> node1(123) --next--> none
 
         /**
-         * build `let opt_none = Option::None`
+         * `let opt_none = Option::None`
          */
 
         let opt_none = evaluator.evalFromString(`
             std.Option.None`
         );
 
-        // check mark
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${opt_none} 0)`), 0);
-
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${opt_none} 1)`), 0);
-
-        // check internal value
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${opt_none} 0)`), 1);
-
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${opt_none} 8)`), 0);
-
         /**
-         * build `let node1 = Node::new(123, opt_none)`
+         * `let node1 = Node::new(123, opt_none)`
          */
 
         let node1 = evaluator.evalFromString(`
@@ -51,43 +40,41 @@ class TestLinkList {
 
         // check value
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${node1} 0)`), 123);
-
-        // check mark
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${node1} 0)`), 0);
-
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${node1} 1)`), 1);
-
-        // check internal value
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.get_address ${node1} 1)`), opt_none);
+            `(std.Node.getValue ${node1})`), 123);
 
         /**
          * build `let opt_1 = Option::Some(node1)`
          */
 
-        let opt_1 = evaluator.evalFromString(`
+        let opt_node1 = evaluator.evalFromString(`
             (do
                 (let addr (std.Option.Some ${node1}))
                 (builtin.memory.inc_ref addr)
                 addr
             )`);
 
+        /**
+         * `let node2 = Node::new(456, opt_node1)`
+         */
 
-        // // build `let op2 = Option::new(n1)`
-        // let op2 = evaluator.evalFromString(`
-        //     (do
-        //         (let addr (std.Option.new ${n1}))
-        //         (builtin.memory.inc_ref addr)
-        //         addr
-        //     )`);
+        let node2 = evaluator.evalFromString(`
+            (do
+                (let addr (std.Node.new 456 ${opt_node1}))
+                (builtin.memory.inc_ref addr)
+                addr
+            )`);
+
+        // check value
+        assert.equal(evaluator.evalFromString(
+            `(std.Node.getValue ${node2})`), 456);
+
+
+
 
     }
 
     static testLinkList() {
-        // TestLinkList.testCreateNode();
+        TestLinkList.testCreateNode();
 
         console.log('Link-list passed');
     }

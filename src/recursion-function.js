@@ -10,7 +10,7 @@ class RecursionFunction {
         this.name = name;
         this.parameters = parameters;
         this.bodyExp = bodyExp;
-        this.context = context; // 定义函数时所在的作用域
+        this.context = context; // 定义函数时所在的 namespace
     }
 }
 

@@ -1,67 +1,138 @@
 import { strict as assert } from 'assert';
-import path from 'path';
 
 import {
     Evaluator,
-    EvalError,
-    SyntaxError,
-    IdentifierError
 } from "../index.js";
 
 class TestUserDefinedType {
+
+    static testCreateBytes() {
+        let evaluator = new Evaluator();
+
+        // a1 = [int32, int64, int32, int64]
+        // 4,8,4,8
+        let addr1 = evaluator.evalFromString(
+            `
+            (do
+                (let addr (builtin.memory.create_bytes 24))
+                addr
+            )`);
+
+        let chunk1 = evaluator.memory.getChunk(addr1);
+        assert.equal(chunk1.ref, 0);
+        assert.equal(chunk1.type, 2);
+        assert.equal(chunk1.count, 0);
+        assert.equal(chunk1.mark, 0); // bytes 无此字段，默认值为 0
+        assert.equal(chunk1.size, 24);
+
+        // write
+        evaluator.evalFromString(
+            `
+            (do
+                (builtin.memory.i32_write ${addr1} 0 11)
+                (builtin.memory.i64_write ${addr1} 4 22)
+                (builtin.memory.i32_write ${addr1} 12 33)
+                (builtin.memory.i64_write ${addr1} 16 44)
+            )`);
+
+        // read
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i32_read ${addr1} 0)`), 11);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 4)`), 22);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i32_read ${addr1} 12)`), 33);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 16)`), 44);
+
+        // update
+        evaluator.evalFromString(
+            `
+            (do
+                (builtin.memory.i32_write ${addr1} 0 8811)
+                (builtin.memory.i64_write ${addr1} 4 8822)
+                (builtin.memory.i32_write ${addr1} 12 8833)
+                (builtin.memory.i64_write ${addr1} 16 8844)
+            )`);
+
+        // verify
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i32_read ${addr1} 0)`), 8811);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 4)`), 8822);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i32_read ${addr1} 12)`), 8833);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 16)`), 8844);
+    }
 
     static testCreateStruct() {
         let evaluator = new Evaluator();
 
         // a1 = {
-        //     i64 x = 1234,
-        //     i64 y = 5678
+        //     i64 x = 123,
+        //     i64 y = 456
         // }
         let addr1 = evaluator.evalFromString(
             `
             (do
-                (let addr1 (builtin.memory.create_struct 2))
-                (builtin.memory.i64_write addr1 0 1234)
-                (builtin.memory.i64_write addr1 8 5678)
-                addr1
+                (let addr (builtin.memory.create_struct 2 0))
+                addr
             )`
         );
 
+        let chunk1 = evaluator.memory.getChunk(addr1);
+        assert.equal(chunk1.ref, 0);
+        assert.equal(chunk1.type, 1);
+        assert.equal(chunk1.count, 2);
+        assert.equal(chunk1.mark, 0b00);
+        assert.equal(chunk1.size, 0); // struct 无此字段，默认值为 0
+
+        // write
+        evaluator.evalFromString(
+            `
+            (do
+                (builtin.memory.i64_write ${addr1} 0 123)
+                (builtin.memory.i64_write ${addr1} 8 456)
+            )`);
+
+        // read
         assert.equal(evaluator.evalFromString(
             `(builtin.memory.i64_read ${addr1} 0)`
-        ), 1234);
+        ), 123);
 
         assert.equal(evaluator.evalFromString(
             `(builtin.memory.i64_read ${addr1} 8)`
-        ), 5678);
-
-        // check mark
-        assert.equal(evaluator.evalFromString(
-            `
-            (builtin.memory.read_mark ${addr1} 0)
-            `), 0);
-
-        assert.equal(evaluator.evalFromString(
-            `
-            (builtin.memory.read_mark ${addr1} 1)
-            `), 0);
-
-        let chunk1 = evaluator.memory.getChunk(addr1);
-        assert.equal(chunk1.mark, 0);
+        ), 456);
 
         // a2 = {
-        //     i64 x = 1122,
-        //     i64 y = 3344
+        //     i64 x = 666,
+        //     i64 y = 777
         // }
         let addr2 = evaluator.evalFromString(
             `
             (do
-                (let addr2 (builtin.memory.create_struct 2))
-                (builtin.memory.i64_write addr2 0 1122)
-                (builtin.memory.i64_write addr2 8 3344)
-                addr2
+                (let addr (builtin.memory.create_struct 2 0))
+                (builtin.memory.i64_write addr 0 666)
+                (builtin.memory.i64_write addr 8 777)
+                addr
             )`
         );
+
+        // read
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr2} 0)`
+        ), 666);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr2} 8)`
+        ), 777);
 
         // a3 = {
         //     a1,
@@ -70,38 +141,31 @@ class TestUserDefinedType {
         let addr3 = evaluator.evalFromString(
             `
             (do
-                (let addr3 (builtin.memory.create_struct 2))
-                (builtin.memory.inc_ref addr3)
-                (builtin.memory.add_ref addr3 0 ${addr1})
-                (builtin.memory.add_ref addr3 1 ${addr2})
-                addr3
+                (let addr (builtin.memory.create_struct 2 3))
+                (builtin.memory.add_ref addr 0 ${addr1})
+                (builtin.memory.add_ref addr 1 ${addr2})
+                (builtin.memory.inc_ref addr)
+                addr
             )`
         );
+
+        let chunk3 = evaluator.memory.getChunk(addr3);
+        assert.equal(chunk3.ref, 1);
+        assert.equal(chunk3.type, 1);
+        assert.equal(chunk3.count, 2);
+        assert.equal(chunk3.mark, 0b11);
+        assert.equal(chunk3.size, 0); // struct 无此字段，默认值为 0
 
         // check ref address
         assert.equal(evaluator.evalFromString(
             `
-            (builtin.memory.get_address ${addr3} 0)
+            (builtin.memory.read_address ${addr3} 0)
             `), addr1);
 
         assert.equal(evaluator.evalFromString(
             `
-            (builtin.memory.get_address ${addr3} 1)
+            (builtin.memory.read_address ${addr3} 1)
             `), addr2);
-
-        // check mark
-        assert.equal(evaluator.evalFromString(
-            `
-            (builtin.memory.read_mark ${addr3} 0)
-            `), 1);
-
-        assert.equal(evaluator.evalFromString(
-            `
-            (builtin.memory.read_mark ${addr3} 1)
-            `), 1);
-
-        let chunk3 = evaluator.memory.getChunk(addr3);
-        assert.equal(chunk3.mark, 0b11);
 
         assert.deepEqual(evaluator.memory.status(), {
             capacity: 3,
@@ -109,7 +173,15 @@ class TestUserDefinedType {
             used: 3
         });
 
-        // drop chunk3
+        // check updated chunk1
+        let chunk1b = evaluator.memory.getChunk(addr1);
+        assert.equal(chunk1b.ref, 1);
+
+        // check updated chunk2
+        let chunk2b = evaluator.memory.getChunk(addr2);
+        assert.equal(chunk2b.ref, 1);
+
+        // 减少 chunk3 的引用计数，chunk1 和 chunk2 应该都会被资源回收
         evaluator.evalFromString(
             `(builtin.memory.dec_ref ${addr3})`
         );
@@ -121,160 +193,92 @@ class TestUserDefinedType {
         });
     }
 
-    static testCreateStructByStd() {
-        let optionFilePath = path.resolve('test', 'resources', 'option.clj');
-
+    static testCreateStructChunkDestructor() {
         let evaluator = new Evaluator();
-        evaluator.loadModuleFromFile('std', optionFilePath);
 
-        // build `let a1 = Option::Some::new(123)`
-        let a1 = evaluator.evalFromString(`
+        // !! 目前的解析器使用 Map 以及标识符的全称作为 key 来装载用户自定义函数，
+        // !! 无法函数的地址，所以在 Chunk 的 destructor 字段里
+        // !! 存放的是析构函数的标识符全称，比如 `user.Stream.drop`。
+
+        // 目标：
+        // 构建一个用于检验的 chunk1 = {x: 10, y: 20}
+        // 构建一个用于附加构造函数的 chunk2
+        // 当 chunk2 被资源回收时，析构函数会把 chunk2 的数据复制到 chunk1
+        // 检查 chunk1 的数据，如果发现更新，则说明析构函数被正确执行。
+
+        let addr1 = evaluator.evalFromString(
+            `
             (do
-                (let addr (std.Option.Some.new 123))
+                (let addr (builtin.memory.create_struct 2 0))
                 (builtin.memory.inc_ref addr)
+                (builtin.memory.i64_write addr 0 10)
+                (builtin.memory.i64_write addr 8 20)
                 addr
             )`);
 
-        // build `let a2 = Option::Some::new(456)`
-        let a2 = evaluator.evalFromString(`
-            (do
-                (let addr (std.Option.Some.new 456))
-                (builtin.memory.inc_ref addr)
-                addr
+        // read
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 0)`
+        ), 10);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 8)`
+        ), 20);
+
+        // 定义析构函数
+        evaluator.evalFromString(
+            `
+            (defn drop (pointAddr)
+                (do
+                    ;; 复制被回收的 point 对象的 x,y 值
+                    (builtin.memory.i64_write ${addr1} 0 (builtin.memory.i64_read pointAddr 0))
+                    (builtin.memory.i64_write ${addr1} 8 (builtin.memory.i64_read pointAddr 8))
+                )
             )`);
 
-        // build `let a3 = Option::Some::new(123)`
-        let a3 = evaluator.evalFromString(`
+        // 创建带有析构函数的结构体 chunk2 = {x: 1234, y: 5678}
+
+        // 注：无法使用 IR 语句创建
+        let addr2 = evaluator.memory.createStructDestructor(2, 0, 'user.drop');
+
+        evaluator.evalFromString(
+            `
             (do
-                (let addr (std.Option.Some.new 123))
-                (builtin.memory.inc_ref addr)
-                addr
+                (builtin.memory.inc_ref ${addr2})
+                (builtin.memory.i64_write ${addr2} 0 1234)
+                (builtin.memory.i64_write ${addr2} 8 5678)
             )`);
-
-        // Option::Some::equal(a1, a2)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.Some.equal ${a1} ${a2})`), 0);
-
-        // Option::Some::equal(a1, a3)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.Some.equal ${a1} ${a3})`), 1);
-
-        // Option::Some::equal(a2, a3)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.Some.equal ${a2} ${a3})`), 0);
-
-        // Option::Some::equal(a1, a1)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.Some.equal ${a1} ${a1})`), 1);
-    }
-
-    static testCreateUnionByStd() {
-        let optionFilePath = path.resolve('test', 'resources', 'option.clj');
-
-        let evaluator = new Evaluator();
-        evaluator.loadModuleFromFile('std', optionFilePath);
-
-        // build `let b1 = Option::Some(11)`
-        let b1 = evaluator.evalFromString(`
-            (do
-                (let addr (std.Option.Some 11))
-                (builtin.memory.inc_ref addr)
-                addr
-            )`
-        );
-
-        // check mark
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${b1} 0)`), 0);
-
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${b1} 1)`), 1);
-
-        // build `let b1 = Option::Some(22)`
-        let b2 = evaluator.evalFromString(`
-            (do
-                (let addr (std.Option.Some 22))
-                (builtin.memory.inc_ref addr)
-                addr
-            )`
-        );
-
-        // build `let b3 = Option::Some(11)`
-        let b3 = evaluator.evalFromString(`
-            (do
-                (let addr (std.Option.Some 11))
-                (builtin.memory.inc_ref addr)
-                addr
-            )`
-        );
-
-        // build `let b4 = Option::None`
-        let b4 = evaluator.evalFromString(`
-            std.Option.None`
-        );
-
-        // check mark
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${b4} 0)`), 0);
-
-        assert.equal(evaluator.evalFromString(
-            `(builtin.memory.read_mark ${b4} 1)`), 0);
-
-        // Option::equal(b1, b2)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b1} ${b2})`), 0);
-
-        // Option::equal(b1, b3)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b1} ${b3})`), 1);
-
-        // Option::equal(b2, b3)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b2} ${b3})`), 0);
-
-        // Option::equal(b1, b4)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b1} ${b4})`), 0);
-
-        // Option::equal(b1, b1)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b1} ${b1})`), 1);
-
-        // Option::equal(b2, b4)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b2} ${b4})`), 0);
-
-        // Option::equal(b4, b4)
-        assert.equal(evaluator.evalFromString(
-            `(std.Option.equal ${b4} ${b4})`), 1);
 
         assert.deepEqual(evaluator.memory.status(), {
-            capacity: 7,
+            capacity: 2,
             free: 0,
-            used: 7
+            used: 2
         });
 
-        // drop b1, b2, b3
-        evaluator.evalFromString(`
-            (do
-                (builtin.memory.dec_ref ${b1})
-                (builtin.memory.dec_ref ${b2})
-                (builtin.memory.dec_ref ${b3})
-            )`
-        );
+        // 释放 chunk2
+        evaluator.evalFromString(`(builtin.memory.dec_ref ${addr2})`);
 
-        // b1, b2, b3 等 Option 实例以及内层的 Some 实例应该被回收，
+        // 检查 chunk1 的值
+        // read
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 0)`
+        ), 1234);
+
+        assert.equal(evaluator.evalFromString(
+            `(builtin.memory.i64_read ${addr1} 8)`
+        ), 5678);
+
         assert.deepEqual(evaluator.memory.status(), {
-            capacity: 7,
-            free: 6,
+            capacity: 2,
+            free: 1,
             used: 1
         });
     }
 
     static testUserDefinedType() {
+        TestUserDefinedType.testCreateBytes();
         TestUserDefinedType.testCreateStruct();
-        TestUserDefinedType.testCreateStructByStd();
-        TestUserDefinedType.testCreateUnionByStd();
+        TestUserDefinedType.testCreateStructChunkDestructor();
 
         console.log('User-defined type passed');
     }
