@@ -25,8 +25,7 @@ class TestMemory {
         let chunk1 = memory.getChunk(addr1);
         assert.equal(chunk1.ref, 0);
         assert.equal(chunk1.type, 2);
-        assert.equal(chunk1.count, 0);
-        assert.equal(chunk1.mark, 0); // bytes 无此字段，默认值为 0
+        assert.equal(chunk1.mark, 0); // bytes 不使用此字段，默认值为 0
         assert.equal(chunk1.size, 24);
 
         assert.deepEqual(memory.status(), {
@@ -210,14 +209,13 @@ class TestMemory {
         //     i64 x = 123,
         //     i64 y = 456
         // }
-        let addr1 = memory.createStruct(2, 0b00);
+        let addr1 = memory.createStruct(16, 0b00);
 
         let chunk1 = memory.getChunk(addr1);
         assert.equal(chunk1.ref, 0);
         assert.equal(chunk1.type, 1);
-        assert.equal(chunk1.count, 2);
         assert.equal(chunk1.mark, 0b00);
-        assert.equal(chunk1.size, 0); // struct 无此字段，默认值为 0
+        assert.equal(chunk1.size, 16);
 
         // write chunk1
         chunk1.i64Write(0, 123);
@@ -232,7 +230,7 @@ class TestMemory {
         //     i64 y = 777
         // }
 
-        let addr2 = memory.createStruct(2, 0b00);
+        let addr2 = memory.createStruct(16, 0b00);
 
         let chunk2 = memory.getChunk(addr2);
 
@@ -249,22 +247,21 @@ class TestMemory {
         //     point bottom_right = chunk2,
         // }
 
-        let addr3 = memory.createStruct(2, 0b11);
+        let addr3 = memory.createStruct(16, 0b11);
         memory.incRef(addr3);
 
         let chunk3 = memory.getChunk(addr3);
         assert.equal(chunk3.ref, 1);
         assert.equal(chunk3.type, 1);
-        assert.equal(chunk3.count, 2);
         assert.equal(chunk3.mark, 0b11);
-        assert.equal(chunk3.size, 0); // struct 无此字段，默认值为 0
+        assert.equal(chunk3.size, 16);
 
         memory.addRef(addr3, 0, addr1);
-        memory.addRef(addr3, 1, addr2);
+        memory.addRef(addr3, 8, addr2);
 
         // read chunk3
         assert.equal(chunk3.readAddress(0), addr1);
-        assert.equal(chunk3.readAddress(1), addr2);
+        assert.equal(chunk3.readAddress(8), addr2);
 
         assert.deepEqual(memory.status(), {
             capacity: 3,
@@ -301,18 +298,18 @@ class TestMemory {
         // (let) chunk_b2 = {chunk1, chunk3}
 
         let addr1 = memory.createBytes(8);
-        let addr2 = memory.createStruct(2, 0b00);
-        let addr3 = memory.createStruct(2, 0b00);
+        let addr2 = memory.createStruct(16, 0b00);
+        let addr3 = memory.createStruct(16, 0b00);
 
-        let addrB1 = memory.createStruct(2, 0b11);
+        let addrB1 = memory.createStruct(16, 0b11);
         memory.incRef(addrB1);
         memory.addRef(addrB1, 0, addr1);
-        memory.addRef(addrB1, 1, addr2);
+        memory.addRef(addrB1, 8, addr2);
 
-        let addrB2 = memory.createStruct(2, 0b11);
+        let addrB2 = memory.createStruct(16, 0b11);
         memory.incRef(addrB2);
         memory.addRef(addrB2, 0, addr1);
-        memory.addRef(addrB2, 1, addr3);
+        memory.addRef(addrB2, 8, addr3);
 
         // check refs
         assert.equal(memory.getChunk(addr1).ref, 2);
@@ -365,18 +362,18 @@ class TestMemory {
          * line a
          */
 
-        let a1 = memory.createStruct(1, 0b0);
+        let a1 = memory.createStruct(8, 0b0);
 
-        let a2 = memory.createStruct(1, 0b1);
+        let a2 = memory.createStruct(8, 0b1);
         memory.addRef(a2, 0, a1);
 
-        let a3 = memory.createStruct(1, 0b1);
+        let a3 = memory.createStruct(8, 0b1);
         memory.addRef(a3, 0, a2);
 
-        let a4 = memory.createStruct(1, 0b1);
+        let a4 = memory.createStruct(8, 0b1);
         memory.addRef(a4, 0, a3);
 
-        let head1 = memory.createStruct(1, 0b1);
+        let head1 = memory.createStruct(8, 0b1);
         memory.addRef(head1, 0, a4);
 
         memory.incRef(head1);
@@ -385,10 +382,10 @@ class TestMemory {
          * line b
          */
 
-        let b1 = memory.createStruct(1, 0b1);
+        let b1 = memory.createStruct(8, 0b1);
         memory.addRef(b1, 0, a3);
 
-        let head2 = memory.createStruct(1, 0b1);
+        let head2 = memory.createStruct(8, 0b1);
         memory.addRef(head2, 0, b1);
 
         memory.incRef(head2);
@@ -397,13 +394,13 @@ class TestMemory {
          * line c
          */
 
-        let c1 = memory.createStruct(1, 0b1);
+        let c1 = memory.createStruct(8, 0b1);
         memory.addRef(c1, 0, a2);
 
-        let c2 = memory.createStruct(1, 0b1);
+        let c2 = memory.createStruct(8, 0b1);
         memory.addRef(c2, 0, c1);
 
-        let head3 = memory.createStruct(1, 0b1);
+        let head3 = memory.createStruct(8, 0b1);
         memory.addRef(head3, 0, c2);
 
         memory.incRef(head3);
@@ -412,10 +409,10 @@ class TestMemory {
          * line d
          */
 
-        let d1 = memory.createStruct(1, 0b1);
+        let d1 = memory.createStruct(8, 0b1);
         memory.addRef(d1, 0, a2);
 
-        let head4 = memory.createStruct(1, 0b1);
+        let head4 = memory.createStruct(8, 0b1);
         memory.addRef(head4, 0, d1);
 
         memory.incRef(head4);

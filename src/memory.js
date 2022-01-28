@@ -66,21 +66,16 @@ class Memory {
         return this.addChuck(chunk);
     }
 
-    // /*int*/createBytesZero(/*int*/  bytesLength) {
-    //     let chunk = Chunk.createBytes(bytesLength);
-    //     return this.addChuck(chunk);
-    // }
-
-    /*int*/ createStruct(/*int32*/ count, mark) {
-        let chunk = Chunk.createStruct(count, mark);
+    /*int*/ createStruct(/*int32*/ bytes_length, mark) {
+        let chunk = Chunk.createStruct(bytes_length, mark);
         return this.addChuck(chunk);
     }
 
-    /*int*/ createStructDestructor(/*int32*/ count, mark, destructor) {
+    /*int*/ createStructDestructor(/*int32*/ bytes_length, mark, destructor) {
         // !! 目前的解析器使用 Map 以及标识符的全称作为 key 来装载用户自定义函数，
         // !! 无法函数的地址，所以在 Chunk 的 destructor 字段里
         // !! 存放的是析构函数的标识符全称，比如 `user.Stream.drop`。
-        let chunk = Chunk.createStructDestructor(count, mark, destructor);
+        let chunk = Chunk.createStructDestructor(bytes_length, mark, destructor);
         return this.addChuck(chunk);
     }
 
@@ -121,9 +116,10 @@ class Memory {
 
                 // 减少所有子对象的引用计数值
                 let mark = chunk.mark;
-                for (let idx = 0; idx < chunk.count; idx++) {
+                let count = chunk.size / 8;
+                for (let idx = 0; idx < count; idx++) {
                     if ((mark & 1) === 1) {
-                        let targetAddr = chunk.readAddress(idx);
+                        let targetAddr = chunk.readAddress(idx * 8);
                         this.decRef(targetAddr);
                     }
 
@@ -147,13 +143,13 @@ class Memory {
         }
     }
 
-    /*int32*/ addRef(/*int*/ addr, /*int32*/ memberIndex, /*int*/ refAddr) {
+    /*int32*/ addRef(/*int*/ addr, /*int32*/ byteOffset, /*int*/ refAddr) {
 
         let chunk = this.chunks[addr];
 
         // javascript lacks int64, so temporarily use int32 instead
         var view = new DataView(chunk.data);
-        view.setUint32(memberIndex * 8, refAddr);
+        view.setUint32(byteOffset, refAddr);
 
         return this.incRef(refAddr);
     }

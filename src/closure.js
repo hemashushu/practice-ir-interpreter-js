@@ -8,9 +8,8 @@ class Closure /* implement IChunk, IContext */ {
     constructor(ref, mark, names, values, anonymousFunc, namespace) {
         this.ref = ref;
         this.type = 4;
-        this.count = names.length;
         this.mark = mark;
-        this.size = 0;
+        this.size = (names.length) * 8;
 
         this.names = names;
         this.values = values;
@@ -41,8 +40,8 @@ class Closure /* implement IChunk, IContext */ {
         return this.i32Read(addr, byteOffset);
     }
 
-    /*int*/ readAddress(/*int32*/ memberIndex) {
-        return this.values[memberIndex];
+    /*int*/ readAddress(/*int32*/ byteOffset) {
+        return this.values[byteOffset / 8];
     }
 
     defineIdentifier(name, value) {

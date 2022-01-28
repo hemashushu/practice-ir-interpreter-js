@@ -19,9 +19,9 @@
                 (builtin.panic 10002) ;; 分母不允许为 0
                 (do
                     ;; TODO:: 公约数化简
-                    (let addr (builtin.memory.create_struct 2 0))
-                    (builtin.memory.i64_write addr 0 n)
-                    (builtin.memory.i64_write addr 8 m)
+                    (let addr (builtin.memory.create_struct 16 0))
+                    (builtin.memory.write_i64 addr 0 n)
+                    (builtin.memory.write_i64 addr 8 m)
                     addr
                 )
             )
@@ -31,13 +31,13 @@
     ;; 获取分子
     (defn getN
         (addr)
-        (builtin.memory.i64_read addr 0)
+        (builtin.memory.read_i64 addr 0)
     )
 
     ;; 获取分母
     (defn getM
         (addr)
-        (builtin.memory.i64_read addr 8)
+        (builtin.memory.read_i64 addr 8)
     )
 
     ;; 判断是否相等

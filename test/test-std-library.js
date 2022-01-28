@@ -9,7 +9,7 @@ import {
 } from "../index.js";
 
 class TestStdLibrary {
-    static testRatio() {
+    static testStruct() {
         let srcFilePath = path.resolve('test', 'resources', 'ratio.clj');
 
         let evaluator = new Evaluator();
@@ -34,7 +34,10 @@ class TestStdLibrary {
             addr
         )`);
 
-        // 构造 Ratio 实例 r2 = 2/3
+        assert.equal(evaluator.evalFromString(`(std.Ratio.getN ${r2})`), 4);
+        assert.equal(evaluator.evalFromString(`(std.Ratio.getM ${r2})`), 5);
+
+        // 构造 Ratio 实例 r3 = 2/3
         let r3 = evaluator.evalFromString(`
         (do
             (let addr (std.Ratio.new 2 3))
@@ -55,7 +58,7 @@ class TestStdLibrary {
         assert.equal(evaluator.evalFromString(
             `(std.Ratio.equal ${r1} ${r1})`), 1);
 
-        // 测试加法 r4 = r1 + r2 = 22/15
+        // 测试加法 r4 = r1 + r2 = 2/3 + 4/5 = 22/15
         let r4 = evaluator.evalFromString(`
             (do
                 (let addr (std.Ratio.add ${r1} ${r2}))
@@ -66,11 +69,22 @@ class TestStdLibrary {
         assert.equal(evaluator.evalFromString(`(std.Ratio.getN ${r4})`), 22);
         assert.equal(evaluator.evalFromString(`(std.Ratio.getM ${r4})`), 15);
 
+        // r5 = r1 + r3 = 2/3 + 2/3 = 12/9
+        let r5 = evaluator.evalFromString(`
+            (do
+                (let addr (std.Ratio.add ${r1} ${r3}))
+                (builtin.memory.inc_ref addr)
+                addr
+            )`);
+
+        assert.equal(evaluator.evalFromString(`(std.Ratio.getN ${r5})`), 12);
+        assert.equal(evaluator.evalFromString(`(std.Ratio.getM ${r5})`), 9);
+
         // 检查内存
         assert.deepEqual(evaluator.memory.status(), {
-            capacity: 4,
+            capacity: 5,
             free: 0,
-            used: 4
+            used: 5
         });
 
         // 释放对象
@@ -81,17 +95,18 @@ class TestStdLibrary {
                 (builtin.memory.dec_ref ${r2})
                 (builtin.memory.dec_ref ${r3})
                 (builtin.memory.dec_ref ${r4})
+                (builtin.memory.dec_ref ${r5})
             )`);
 
         // 检查内存
         assert.deepEqual(evaluator.memory.status(), {
-            capacity: 4,
-            free: 4,
+            capacity: 5,
+            free: 5,
             used: 0
         });
     }
 
-    static testUnionMember() {
+    static testUnionSubType() {
         let srcFilePath = path.resolve('test', 'resources', 'option.clj');
 
         let evaluator = new Evaluator();
@@ -104,6 +119,10 @@ class TestStdLibrary {
                 (builtin.memory.inc_ref addr)
                 addr
             )`);
+
+console.log(evaluator.memory.chunks);
+        assert.equal(evaluator.evalFromString(
+            `(std.Option.Some.getValue ${a1})`), 123)
 
         // build `let a2 = Option::Some::new(456)`
         let a2 = evaluator.evalFromString(`
@@ -176,6 +195,13 @@ class TestStdLibrary {
             std.Option.None`
         );
 
+        // test getMemberTypeIndex
+        assert.equal(evaluator.evalFromString(
+            `(std.Option.getMemberTypeIndex ${b1})`), 0);
+
+        assert.equal(evaluator.evalFromString(
+            `(std.Option.getMemberTypeIndex ${b4})`), 1);
+
         // Option::equal(b1, b2)
         assert.equal(evaluator.evalFromString(
             `(std.Option.equal ${b1} ${b2})`), 0);
@@ -232,9 +258,9 @@ class TestStdLibrary {
     }
 
     static testStdLibrary() {
-        TestStdLibrary.testRatio();
-        TestStdLibrary.testUnionMember();
-        TestStdLibrary.testUnion();
+        // TestStdLibrary.testStruct();
+        TestStdLibrary.testUnionSubType();
+        // TestStdLibrary.testUnion();
 
         console.log('Std library passed');
     }

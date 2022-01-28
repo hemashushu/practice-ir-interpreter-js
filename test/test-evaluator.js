@@ -218,13 +218,14 @@ class TestEvaluator {
 
         // try lookup another block variable
         try {
-            evaluator.evalFromStringMultiExps(
-                `
-                (do
-                    (let i 2)
-                )
-                (do
-                    i
+            evaluator.evalFromString(
+                `(do
+                    (do
+                        (let i 2)
+                    )
+                    (do
+                        i
+                    )
                 )`
             );
             assert.fail();

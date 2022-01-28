@@ -1,22 +1,27 @@
-;; 联合体 Option
+;; 链表 Node
+
+;; struct Node
+;;     Int value
+;;     Option<Node> nextOptionNode
+;; end
 
 ;; union Option
-;;     Some(Int value)
+;;     Some(Node node)
 ;;     None
 ;; end
 ;;
 ;; 函数：
-;; Option::Some(Int value) -> Option::Some
+;; Option::Some(Node node) -> Option::Some
 ;;
 ;; 常量：
 ;; Option::None
 
-
-;; !! 模块名称 "std"
+;; !! 模块名称 "collection"
 
 (namespace Option
+
     ;; 私有方法
-    ;; std::Option::new(WordWidth member_type_index, Any member_addr) -> std::Option
+    ;; collection::Option::new(WordWidth member_type_index, Any member_addr) -> collection::Option
     ;; 构建联合体的结构体类型成员
 
     (defn new
@@ -30,7 +35,7 @@
     )
 
     ;; 私有方法
-    ;; std::Option::new$1(WordWidth member_type_index) -> std::Option
+    ;; collection::Option::new$1(WordWidth member_type_index) -> collection::Option
     ;; 构建联合体的常量型成员
 
     (defn new$1
@@ -43,17 +48,17 @@
         )
     )
 
-    ;; std::Option::Some(Int value) -> Option::Some
+    ;; collection::Option::Some(Node node) -> Option::Some
     ;; 快捷构建子成员的方法
 
-    (defn Some (value)
+    (defn Some (node_addr)
         (do
-            (let addr (std.Option.Some.new value))
+            (let addr (collection.Option.Some.new node_addr))
             (new 0 addr)
         )
     )
 
-    ;; std::Option::None
+    ;; collection::Option::None
 
     (const None
         (do
@@ -63,14 +68,14 @@
         )
     )
 
-    ;; std::Option::getMemberTypeIndex(Option) -> i64
+    ;; collection::Option::getMemberTypeIndex(Option) -> i64
     ;; 内部方法，获取当前联合体的值的子类型索引
     (defn getMemberTypeIndex
         (addr)
         (builtin.memory.read_i64 addr 0)
     )
 
-    ;; std::Option::getMember(Option) -> Any
+    ;; collection::Option::getMember(Option) -> Any
     ;; 内部方法，获取当前联合体的值（某个从属结构体的实例/地址）
     ;; 联合体的值是其子成员的其中之一
     ;; 如果某个子成员是常量类型，则抛出异常
@@ -89,8 +94,6 @@
         )
     )
 
-    ;; std::Option::equal(Option left, Option right) -> i64
-
     (defn equal
         (left_addr right_addr)
         (do
@@ -100,7 +103,7 @@
                 (if (native.i64.eq left_member_type_index right_member_type_index)
                     (if (native.i64.eq left_member_type_index 0)
                         ;; Option::Some
-                        (std.Option.Some.equal
+                        (collection.Option.Some.equal
                             (builtin.memory.read_address left_addr 8)
                             (builtin.memory.read_address right_addr 8)
                         )
@@ -121,29 +124,67 @@
 (namespace Option.Some
 
     ;; 私有方法
-    ;; std::Option::Some::new(Int value) -> std::Option::Some
-
+    ;; collection::Option::Some::new(Node node) -> collection::Option::Some
     (defn new
-        (value)
+        (node_addr)
         (do
-            (let addr (builtin.memory.create_struct 8 0))
+            (let addr (builtin.memory.create_struct 8 1))
+            (builtin.memory.add_ref addr 0 node_addr)
+            addr
+        )
+    )
+
+    ;; collection::Option::Some::getValue(Some)
+    (defn getValue
+        (addr)
+        (builtin.memory.read_address addr 0)
+    )
+
+    ;; collection::Option::Some::equal(Some left, Some right) -> i64
+    (defn equal
+        (left_addr right_addr)
+        (collection.Option.equal
+            (builtin.memory.read_i64 left_addr 0)
+            (builtin.memory.read_i64 right_addr 0)
+        )
+    )
+)
+
+(namespace Node
+    ;; collection::Node::new(Int value, Option<Node> nextOptionNode) -> Node
+    (defn new
+        (value next_option_node_addr)
+        (do
+            (let addr (builtin.memory.create_struct 16 2)) ;; type 2 = 0b10
             (builtin.memory.write_i64 addr 0 value)
+            (builtin.memory.add_ref addr 8 next_option_node_addr)
             addr
         )
     )
 
     (defn getValue
-        (addr)
-        (builtin.memory.read_i64 addr 0)
+        (node_addr)
+        (builtin.memory.read_i64 node_addr 0)
     )
 
-    ;; std::Option::Some::equal(Some left, Some right) -> i64
+    (defn getNextOptionNode
+        (node_addr)
+        (builtin.memory.read_address node_addr 8)
+    )
 
+    ;; collection::Node::equal(Node left, Node right)
     (defn equal
         (left_addr right_addr)
-        (native.i64.eq
-            (builtin.memory.read_i64 left_addr 0)
-            (builtin.memory.read_i64 right_addr 0)
+        ;; 只有 value 和 nextOptionNode 都相等的情况下才算相等
+        (builtin.and
+            (native.i64.eq
+                (getValue left_addr)
+                (getValue right_addr)
+            )
+            (collection.Option.equal
+                (getNextOptionNode left_addr)
+                (getNextOptionNode right_addr)
+            )
         )
     )
 )

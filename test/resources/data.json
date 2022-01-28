@@ -1,0 +1,14 @@
+[
+    {
+        "type": "chars",
+        "data": "hello你好"
+    },
+    {
+        "type": "utf-8",
+        "data": "hello你好"
+    },
+    {
+        "type": "bytes",
+        "data": "68656c6c6f0a"
+    }
+]

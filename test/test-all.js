@@ -8,13 +8,14 @@ import { TestLinkList } from './test-link-list.js';
 import { TestAnonymousFunction } from './test-anonymous-function.js';
 
 function testAll() {
-    TestSLex.testSLex();
-    TestSParser.testSParser();
-    TestEvaluator.testEvaluator();
-    TestMemory.testMemory();
-    TestUserDefinedType.testUserDefinedType();
+    // TestSLex.testSLex();
+    // TestSParser.testSParser();
+    // TestEvaluator.testEvaluator();
+    // TestMemory.testMemory();
+    // TestUserDefinedType.testUserDefinedType();
     TestStdLibrary.testStdLibrary();
-    TestLinkList.testLinkList();
+
+    // TestLinkList.testLinkList();
     // TestAnonymousFunction.testAnonymousFunction();
 
     console.log('All passed.');

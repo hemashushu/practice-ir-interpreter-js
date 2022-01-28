@@ -21,55 +21,54 @@ class TestUserDefinedType {
         let chunk1 = evaluator.memory.getChunk(addr1);
         assert.equal(chunk1.ref, 0);
         assert.equal(chunk1.type, 2);
-        assert.equal(chunk1.count, 0);
-        assert.equal(chunk1.mark, 0); // bytes 无此字段，默认值为 0
+        assert.equal(chunk1.mark, 0); // bytes 不使用此字段，默认值为 0
         assert.equal(chunk1.size, 24);
 
         // write
         evaluator.evalFromString(
             `
             (do
-                (builtin.memory.i32_write ${addr1} 0 11)
-                (builtin.memory.i64_write ${addr1} 4 22)
-                (builtin.memory.i32_write ${addr1} 12 33)
-                (builtin.memory.i64_write ${addr1} 16 44)
+                (builtin.memory.write_i32 ${addr1} 0 11)
+                (builtin.memory.write_i64 ${addr1} 4 22)
+                (builtin.memory.write_i32 ${addr1} 12 33)
+                (builtin.memory.write_i64 ${addr1} 16 44)
             )`);
 
         // read
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i32_read ${addr1} 0)`), 11);
+            `(builtin.memory.read_i32 ${addr1} 0)`), 11);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 4)`), 22);
+            `(builtin.memory.read_i64 ${addr1} 4)`), 22);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i32_read ${addr1} 12)`), 33);
+            `(builtin.memory.read_i32 ${addr1} 12)`), 33);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 16)`), 44);
+            `(builtin.memory.read_i64 ${addr1} 16)`), 44);
 
         // update
         evaluator.evalFromString(
             `
             (do
-                (builtin.memory.i32_write ${addr1} 0 8811)
-                (builtin.memory.i64_write ${addr1} 4 8822)
-                (builtin.memory.i32_write ${addr1} 12 8833)
-                (builtin.memory.i64_write ${addr1} 16 8844)
+                (builtin.memory.write_i32 ${addr1} 0 8811)
+                (builtin.memory.write_i64 ${addr1} 4 8822)
+                (builtin.memory.write_i32 ${addr1} 12 8833)
+                (builtin.memory.write_i64 ${addr1} 16 8844)
             )`);
 
         // verify
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i32_read ${addr1} 0)`), 8811);
+            `(builtin.memory.read_i32 ${addr1} 0)`), 8811);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 4)`), 8822);
+            `(builtin.memory.read_i64 ${addr1} 4)`), 8822);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i32_read ${addr1} 12)`), 8833);
+            `(builtin.memory.read_i32 ${addr1} 12)`), 8833);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 16)`), 8844);
+            `(builtin.memory.read_i64 ${addr1} 16)`), 8844);
     }
 
     static testCreateStruct() {
@@ -82,7 +81,7 @@ class TestUserDefinedType {
         let addr1 = evaluator.evalFromString(
             `
             (do
-                (let addr (builtin.memory.create_struct 2 0))
+                (let addr (builtin.memory.create_struct 16 0))
                 addr
             )`
         );
@@ -90,25 +89,24 @@ class TestUserDefinedType {
         let chunk1 = evaluator.memory.getChunk(addr1);
         assert.equal(chunk1.ref, 0);
         assert.equal(chunk1.type, 1);
-        assert.equal(chunk1.count, 2);
         assert.equal(chunk1.mark, 0b00);
-        assert.equal(chunk1.size, 0); // struct 无此字段，默认值为 0
+        assert.equal(chunk1.size, 16);
 
         // write
         evaluator.evalFromString(
             `
             (do
-                (builtin.memory.i64_write ${addr1} 0 123)
-                (builtin.memory.i64_write ${addr1} 8 456)
+                (builtin.memory.write_i64 ${addr1} 0 123)
+                (builtin.memory.write_i64 ${addr1} 8 456)
             )`);
 
         // read
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 0)`
+            `(builtin.memory.read_i64 ${addr1} 0)`
         ), 123);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 8)`
+            `(builtin.memory.read_i64 ${addr1} 8)`
         ), 456);
 
         // a2 = {
@@ -118,20 +116,20 @@ class TestUserDefinedType {
         let addr2 = evaluator.evalFromString(
             `
             (do
-                (let addr (builtin.memory.create_struct 2 0))
-                (builtin.memory.i64_write addr 0 666)
-                (builtin.memory.i64_write addr 8 777)
+                (let addr (builtin.memory.create_struct 16 0))
+                (builtin.memory.write_i64 addr 0 666)
+                (builtin.memory.write_i64 addr 8 777)
                 addr
             )`
         );
 
         // read
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr2} 0)`
+            `(builtin.memory.read_i64 ${addr2} 0)`
         ), 666);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr2} 8)`
+            `(builtin.memory.read_i64 ${addr2} 8)`
         ), 777);
 
         // a3 = {
@@ -141,9 +139,9 @@ class TestUserDefinedType {
         let addr3 = evaluator.evalFromString(
             `
             (do
-                (let addr (builtin.memory.create_struct 2 3))
+                (let addr (builtin.memory.create_struct 16 3))
                 (builtin.memory.add_ref addr 0 ${addr1})
-                (builtin.memory.add_ref addr 1 ${addr2})
+                (builtin.memory.add_ref addr 8 ${addr2})
                 (builtin.memory.inc_ref addr)
                 addr
             )`
@@ -152,9 +150,8 @@ class TestUserDefinedType {
         let chunk3 = evaluator.memory.getChunk(addr3);
         assert.equal(chunk3.ref, 1);
         assert.equal(chunk3.type, 1);
-        assert.equal(chunk3.count, 2);
         assert.equal(chunk3.mark, 0b11);
-        assert.equal(chunk3.size, 0); // struct 无此字段，默认值为 0
+        assert.equal(chunk3.size, 16);
 
         // check ref address
         assert.equal(evaluator.evalFromString(
@@ -164,7 +161,7 @@ class TestUserDefinedType {
 
         assert.equal(evaluator.evalFromString(
             `
-            (builtin.memory.read_address ${addr3} 1)
+            (builtin.memory.read_address ${addr3} 8)
             `), addr2);
 
         assert.deepEqual(evaluator.memory.status(), {
@@ -209,20 +206,20 @@ class TestUserDefinedType {
         let addr1 = evaluator.evalFromString(
             `
             (do
-                (let addr (builtin.memory.create_struct 2 0))
+                (let addr (builtin.memory.create_struct 16 0))
                 (builtin.memory.inc_ref addr)
-                (builtin.memory.i64_write addr 0 10)
-                (builtin.memory.i64_write addr 8 20)
+                (builtin.memory.write_i64 addr 0 10)
+                (builtin.memory.write_i64 addr 8 20)
                 addr
             )`);
 
         // read
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 0)`
+            `(builtin.memory.read_i64 ${addr1} 0)`
         ), 10);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 8)`
+            `(builtin.memory.read_i64 ${addr1} 8)`
         ), 20);
 
         // 定义析构函数
@@ -231,22 +228,22 @@ class TestUserDefinedType {
             (defn drop (pointAddr)
                 (do
                     ;; 复制被回收的 point 对象的 x,y 值
-                    (builtin.memory.i64_write ${addr1} 0 (builtin.memory.i64_read pointAddr 0))
-                    (builtin.memory.i64_write ${addr1} 8 (builtin.memory.i64_read pointAddr 8))
+                    (builtin.memory.write_i64 ${addr1} 0 (builtin.memory.read_i64 pointAddr 0))
+                    (builtin.memory.write_i64 ${addr1} 8 (builtin.memory.read_i64 pointAddr 8))
                 )
             )`);
 
         // 创建带有析构函数的结构体 chunk2 = {x: 1234, y: 5678}
 
         // 注：无法使用 IR 语句创建
-        let addr2 = evaluator.memory.createStructDestructor(2, 0, 'user.drop');
+        let addr2 = evaluator.memory.createStructDestructor(16, 0, 'user.drop');
 
         evaluator.evalFromString(
             `
             (do
                 (builtin.memory.inc_ref ${addr2})
-                (builtin.memory.i64_write ${addr2} 0 1234)
-                (builtin.memory.i64_write ${addr2} 8 5678)
+                (builtin.memory.write_i64 ${addr2} 0 1234)
+                (builtin.memory.write_i64 ${addr2} 8 5678)
             )`);
 
         assert.deepEqual(evaluator.memory.status(), {
@@ -261,11 +258,11 @@ class TestUserDefinedType {
         // 检查 chunk1 的值
         // read
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 0)`
+            `(builtin.memory.read_i64 ${addr1} 0)`
         ), 1234);
 
         assert.equal(evaluator.evalFromString(
-            `(builtin.memory.i64_read ${addr1} 8)`
+            `(builtin.memory.read_i64 ${addr1} 8)`
         ), 5678);
 
         assert.deepEqual(evaluator.memory.status(), {

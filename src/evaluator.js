@@ -173,7 +173,6 @@ class Evaluator {
         //         }
 
         // 命名空间表达式
-        // 无返回值
         //
         // 语法：
         // (namespace namePath
@@ -205,8 +204,7 @@ class Evaluator {
             }
 
             let namespace = this.createNamespace(context.moduleName, fullPath);
-            this.evalExps(exps, namespace);
-            return;
+            return this.evalExps(exps, namespace);
         }
 
 
@@ -898,6 +896,44 @@ class Evaluator {
          *
          */
         // TODO:: 部分未实现
+
+        /**
+         * 本地内存读写
+         *
+         * - `i32 i32_read_8s(int addr, i32 byte_offset)`
+         * - `i32 i32_read_8u(int addr, i32 byte_offset)`
+         * - `i32 i32_read_16s(int addr, i32 byte_offset)`
+         * - `i32 i32_read_16u(int addr, i32 byte_offset)`
+         * - `i32 i32_read(int addr, i32 byte_offset)`
+         *
+         * - `i64 i64_read_8s(int addr, i32 byte_offset)`
+         * - `i64 i64_read_8u(int addr, i32 byte_offset)`
+         * - `i64 i64_read_16s(int addr, i32 byte_offset)`
+         * - `i64 i64_read_16u(int addr, i32 byte_offset)`
+         * - `i64 i64_read_32s(int addr, i32 byte_offset)`
+         * - `i64 i64_read_32u(int addr, i32 byte_offset)`
+         * - `i64 i64_read(int addr, i32 byte_offset)`
+         *
+         * - `f32 f32_read(int addr, i32 byte_offset)`
+         * - `f64 f64_read(int addr, i32 byte_offset)`
+         *
+         * 写入数据的函数：
+         *
+         * - `i32 i32_write_8(int addr, i32 byte_offset, i32 val)`
+         * - `i32 i32_write_16(int addr, i32 byte_offset, i32 val)`
+         * - `i32 i32_write(int addr, i32 byte_offset, i32 val)`
+         *
+         * - `i64 i64_write_8(int addr, i32 byte_offset, i64 val)`
+         * - `i64 i64_write_16(int addr, i32 byte_offset, i64 val)`
+         * - `i64 i64_write_32(int addr, i32 byte_offset, i64 val)`
+         * - `i64 i64_write(int addr, i32 byte_offset, i64 val)`
+         *
+         * - `f32 f32_write(int addr, i32 byte_offset, f32 val)`
+         * - `f64 f64_write(int addr, i32 byte_offset, f64 val)`
+         */
+
+        let nsmemory = this.createNamespace('native', 'native.memory');
+
     }
 
     /**
@@ -905,7 +941,7 @@ class Evaluator {
      */
     addBuiltinFunctions() {
 
-        let nsbuiltin = this.createNamespace('builtin', 'builtin');
+        let nslogic = this.createNamespace('builtin', 'builtin.logic');
 
         /**
         * 逻辑运算
@@ -917,29 +953,64 @@ class Evaluator {
 
         // 逻辑运算
 
-        this.global.defineIdentifier(nsbuiltin.fullPath, 'and', (lh, rh) => {
+        this.global.defineIdentifier(nslogic.fullPath, 'and', (lh, rh) => {
             return (lh & rh) !== 0 ? 1 : 0;
         });
 
-        this.global.defineIdentifier(nsbuiltin.fullPath, 'or', (lh, rh) => {
+        this.global.defineIdentifier(nslogic.fullPath, 'or', (lh, rh) => {
             return (lh | rh) === 0 ? 0 : 1;
         });
 
-        this.global.defineIdentifier(nsbuiltin.fullPath, 'not', (val) => {
+        this.global.defineIdentifier(nslogic.fullPath, 'not', (val) => {
             return val === 0 ? 1 : 0;
         });
 
-        // 调试函数
-        this.global.defineIdentifier(nsbuiltin.fullPath, 'print', (val) => {
+        // IO 相关函数
+        let nsio = this.createNamespace('builtin', 'builtin.io');
+
+        // 打印基本数据类型的数值，数值会转为字符串的形式，如 (print_i64 10) 显示字符串 "10"
+        this.global.defineIdentifier(nsio.fullPath, 'print_i64', (val) => {
             console.log(val);
             return val;
         });
 
-        this.global.defineIdentifier(nsbuiltin.fullPath, 'panic', (code) => {
+        this.global.defineIdentifier(nsio.fullPath, 'print_i32', (val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsio.fullPath, 'print_f32', (val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsio.fullPath, 'print_f64', (val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        // 打印单一个字符，参数为字符的码点值（Unicode code point），如 (putc 65) 显示字符 'A'
+        this.global.defineIdentifier(nsio.fullPath, 'putchar', (val) => {
+            console.log(String.fromCodePoint(val));
+            return val;
+        });
+
+        this.global.defineIdentifier(nsio.fullPath, 'getchar', (val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsio.fullPath, 'gets', (val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        // 中止程序，可传入一个 int 数字，用于表示错误的类型
+        this.global.defineIdentifier(nsio.fullPath, 'panic', (code) => {
             throw new EvalError('RUNTIME_EXCEPTION', { code }, 'Runtime exception');
         });
 
-        // 用户自定义数据
+        // 内存访问和管理
 
         let nsmemory = this.createNamespace('builtin', 'builtin.memory');
 
@@ -947,54 +1018,88 @@ class Evaluator {
             return this.memory.createBytes(bytes_length);
         });
 
-        this.global.defineIdentifier(nsmemory.fullPath, 'create_struct', (count, mark) => {
-            return this.memory.createStruct(count, mark);
+        this.global.defineIdentifier(nsmemory.fullPath, 'create_struct', (bytes_length, mark) => {
+            return this.memory.createStruct(bytes_length, mark);
         });
 
-        this.global.defineIdentifier(nsmemory.fullPath, 'create_struct_destructor', (count, mark, destructor_addr) => {
-            return this.memory.createStructDestructor(count, mark, destructor_addr);
-        });
-
-        this.global.defineIdentifier(nsmemory.fullPath, 'i32_read', (addr, byte_offset) => {
-            let chunk = this.memory.getChunk(addr)
-            return chunk.i32Read(byte_offset);
-        });
-
-        this.global.defineIdentifier(nsmemory.fullPath, 'i64_read', (addr, byte_offset) => {
-            let chunk = this.memory.getChunk(addr)
-            return chunk.i64Read(byte_offset);
-        });
-
-        this.global.defineIdentifier(nsmemory.fullPath, 'i32_write', (addr, byte_offset, val) => {
-            let chunk = this.memory.getChunk(addr)
-            return chunk.i32Write(byte_offset, val);
-        });
-
-        this.global.defineIdentifier(nsmemory.fullPath, 'i64_write', (addr, byte_offset, val) => {
-            let chunk = this.memory.getChunk(addr)
-            return chunk.i64Write(byte_offset, val);
-        });
-
-        // this.global.defineIdentifier(nsmemory.fullPath, 'read_mark', (addr, member_index) => {
-        //     return this.memory.read_mark(addr, member_index);
-        // });
-
-        this.global.defineIdentifier(nsmemory.fullPath, 'read_address', (addr, member_index) => {
-            let chunk = this.memory.getChunk(addr)
-            return chunk.readAddress(member_index);
+        this.global.defineIdentifier(nsmemory.fullPath, 'create_struct_destructor', (bytes_length, mark, destructor_addr) => {
+            return this.memory.createStructDestructor(bytes_length, mark, destructor_addr);
         });
 
         this.global.defineIdentifier(nsmemory.fullPath, 'inc_ref', (addr) => {
             return this.memory.incRef(addr);
         });
 
-        this.global.defineIdentifier(nsmemory.fullPath, 'add_ref', (addr, member_index, ref_addr) => {
-            return this.memory.addRef(addr, member_index, ref_addr);
+        this.global.defineIdentifier(nsmemory.fullPath, 'add_ref', (addr, byte_offset, ref_addr) => {
+            return this.memory.addRef(addr, byte_offset, ref_addr);
         });
 
         this.global.defineIdentifier(nsmemory.fullPath, 'dec_ref', (addr) => {
             return this.memory.decRef(addr);
         });
+
+        // 注：跟 native.memory 的函数不同，这里的 byte_offset 是针对结构体内部数据段的地址开始，而非结构体本身的地址开始。
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'read_i32', (addr, byte_offset) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i32Read(byte_offset);
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'read_i64', (addr, byte_offset) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i64Read(byte_offset);
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'read_f32', (addr, byte_offset) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'read_f64', (addr, byte_offset) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'write_i32', (addr, byte_offset, val) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i32Write(byte_offset, val);
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'write_i64', (addr, byte_offset, val) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.i64Write(byte_offset, val);
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'write_f32', (addr, byte_offset, val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'write_f64', (addr, byte_offset, val) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'read_address', (addr, byte_offset) => {
+            let chunk = this.memory.getChunk(addr)
+            return chunk.readAddress(byte_offset);
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'malloc', (size_bytes) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'free', (addr) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
+        this.global.defineIdentifier(nsmemory.fullPath, 'memcpy', (target, source, size_bytes) => {
+            // not implement yet
+            throw new EvalError('NOT_IMPLEMENT');
+        });
+
     }
 
     getIdentifier(identifierNameOrFullName, context) {
