@@ -1,5 +1,5 @@
 /**
- * XiaoXuan Lang IR 的 `S-表达式` 文本示例：
+ * IR 的 `S-表达式` 文本示例：
  *
  * ; 行注释
  *
@@ -36,6 +36,12 @@
  *      swap([2, 8]))       ; 元组作为实参
  *
  * ; 注：元组不支持嵌套
+ *
+ * ; 标识符的操作符
+ *
+ * (let s:int #hello)       ; # 操作符表示引用名为 `hello` 的只读数据
+ * (map data $foo)          ; $ 操作符表示引用名为 `foo` 的函数
+ * (let i %c.x)             ; % 操作符表示访问闭包的成员的值
  */
 
 const S_LEFT_PAREN = '(';
@@ -48,7 +54,7 @@ const S_PUNCTUATIONS = [
 
 const S_WHITESPACE = [' ', '\t', '\n', '\r'];
 const S_NUMBER_PREFIX = ['-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const S_NUMBER_CONTENT = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', 'e', '-', 's'];
+const S_NUMBER_CONTENT = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', 'e', '-', 'i', 'f'];
 
 const S_COMMENT = ';';
 const S_EOL = '\n';
