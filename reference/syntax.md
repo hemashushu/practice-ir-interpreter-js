@@ -43,7 +43,7 @@
   - [Loop 表达式](#loop-表达式)
   - [Defn 表达式](#defn-表达式)
     - [元组返回值](#元组返回值)
-    - [元组参数](#元组参数)
+    - [动态数据类型参数](#动态数据类型参数)
   - [Call 表达式](#call-表达式)
     - [操作符 `$`](#操作符-1)
     - [匿名函数的实现](#匿名函数的实现)
@@ -1026,16 +1026,18 @@ IR 规定每个函数 **必须** 有返回值，对于确实无数据需要返�
 (let [m:i64 n:i64] (swap 2 8))  ;; `[m:i64 n:i64]` 是一个 `局部变量元组`
 ```
 
-### 元组参数
+### 动态数据类型参数
 
-元组也可以作为函数的参数，在函数的参数列表里使用 `局部变量元组` 即可。
+XiaoXuan Lang 支持 `特性/接口` 类型的参数，也就是动态数据类型的参数，编译到 IR 时，需要由两个参数共同表示这种参数：一个数据表示实参的数据类型，另一个数据表示实参的具体的值。
 
-IR 支持元组参数主要是为了让函数的定义能跟上层语言有一致的结构。有时上层语言的一个函数参数可能需要 IR 的多个数值来表示，比如 XiaoXuan Lang 的 `特性/接口` 类型的参数，也就是动态数据类型，实际上它是由两个数据组成（一个数据表示实参的数据类型，另一个数据表示实参的具体的值）。
+> 上层语言的函数编译到 IR 时，其参数和返回值的形式并不总是一一对应，
 
 示例，假设有如下的上层语言代码：
 
 ```js
-function void say(String s, dyn Writer w) {
+function void say(
+    String s,
+    dyn Writer w) {
     w.writeLine(s);
 }
 ```
@@ -1045,14 +1047,14 @@ function void say(String s, dyn Writer w) {
 ```clojure
 (defn say:int (
     s:int                       ;; 对应着 `String s`
-    [w_type:int w_value:int]    ;; 对应着 `dyn Writer w`
+    w_type:int w_value:int      ;; 对应着 `dyn Writer w`
     )
     (let f:int (lookup w_type "writeLine"))
     (call:int f s)
 )
 ```
 
-调用含有元组类型参数的函数时，传入该参数的值也必须是元组。
+上层语言调用此类函数的语句编译为 IR 时，同样也需要传入两个数据。
 
 示例，假设有如下的上层语言代码：
 
@@ -1071,7 +1073,7 @@ say (s, w);
     (let s:int #hello)
     (let w_type:int ...)
     (let w_value:int ...)
-    (say s [w_type w_value])    ;; `w_type` 和 `w_value` 封装成元组
+    (say s w_type w_value)    ;; `w_type` 和 `w_value` 对应着 `w`
 )
 ```
 
@@ -1114,7 +1116,7 @@ say (s, w);
 
 现代的编程语言一般都支持匿名函数（也称为 `Lambda`），但 IR 并不直接支持在 `用户自定义函数` 里面再定义函数，也就是说无法定义匿名函数，但可以通过变通的方法实现。
 
-上层语言把程序编译为 IR 时，只需把匿名函数代码段抽离出来，视为一个普通的 `用户自定义函数` 来定义即可。函数的名称由编译器自动生成。
+把上层语言程序当中的匿名函数编译为 IR 时，只需把匿名函数代码段抽离出来，视为一个普通的 `用户自定义函数` 来定义即可。函数的名称由编译器自动生成。
 
 示例，假如有如下上层语言的代码：
 
@@ -1198,6 +1200,11 @@ let a = assert(f, 30);
 使用 IR 实现的代码大致如下：
 
 ```clojure
+(defn between (min max)
+    (let c (closure min max))
+    [$_between_anonymous_func_1 c]
+)
+
 (defn _between_anonymous_func_1 (x c)        ;; 自动生成的匿名函数
     (let min %c.min)
     (let max %c.max)
@@ -1207,24 +1214,18 @@ let a = assert(f, 30);
     )
 )
 
-(defn between (min max)
-    (let c (closure min max))
-    [$_between_anonymous_func_1 c]
-)
-
-(defn assert ([func c] value)
-    (call func value c)
+(defn assert (func_addr func_closure value)
+    (call func_addr value func_closure)
 )
 
 (let [f c] (between 20 80))
-(let a (assert [f c] 30))
+(let a (assert f c 30))
 ```
 
-因为 IR 这种对于匿名函数闭包的实现方式，IR 有如下约束：
+因为 IR 采用这种匿名函数闭包的实现方式，所以 IR 有如下约束：
 
-- 上层语言的一个 `函数类型` 的变量需要使用一个 "含有两个元素的" 元组来表示，第一个元素是函数的地址，第二个元素是闭包的地址，这种固定的搭配称为 `函数元组`；
-- 如果一个函数需要返回一个函数，则必须返回一个函数元组；
-- 如果一个函数的参数需要接受一个函数，则该参数必须是一个函数元组。
+- 上层语言的一个 `函数类型` 的变量在 IR 里需要使用两个数据来表示：第一个是函数的地址，第二个是闭包的地址；
+- 如果一个函数需要返回一个函数，则必须返回一个包含有上述两个数据的元组。
 
 ## Defnr 表达式
 
